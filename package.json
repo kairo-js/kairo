@@ -20,12 +20,12 @@
     "devDependencies": {
         "@minecraft/server": "^2.5.0",
         "@minecraft/server-ui": "^2.0.0",
-        "@minecraft/vanilla-data": "^1.26.0",
-        "@types/node": "^24.1.0",
-        "esbuild": "^0.27.2",
-        "fs-extra": "^11.3.0",
+        "@minecraft/vanilla-data": "^1.26.2",
+        "@types/node": "^24.12.0",
+        "esbuild": "^0.27.3",
+        "fs-extra": "^11.3.4",
         "prettier": "3.6.2",
-        "rimraf": "^6.0.1",
-        "typescript": "^5.9.2"
+        "rimraf": "^6.1.3",
+        "typescript": "^5.9.3"
     }
 }
