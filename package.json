@@ -4,9 +4,10 @@
     "description": "**Stable Script API**\r - @minecraft/server - 2.5.0",
     "main": "index.js",
     "type": "module",
+    "packageManager": "pnpm@10.31.0",
     "scripts": {
         "typecheck": "tsc --noEmit",
-        "build": "rimraf BP/scripts && npm run typecheck && node build.mjs && npm run deploy",
+        "build": "rimraf BP/scripts && pnpm run typecheck && node build.mjs && pnpm run deploy",
         "deploy": "node src/deploy.js"
     },
     "repository": {
