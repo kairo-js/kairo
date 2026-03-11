@@ -6,8 +6,9 @@
     "type": "module",
     "packageManager": "pnpm@10.31.0",
     "scripts": {
+        "clean": "rimraf BP/scripts",
         "typecheck": "tsc --noEmit",
-        "build": "rimraf BP/scripts && pnpm run typecheck && node .build/build.mjs && pnpm run deploy",
+        "build": "pnpm run clean && pnpm run typecheck && node .build/build.mjs && pnpm run deploy",
         "deploy": "node .build/deploy.js"
     },
     "repository": {
