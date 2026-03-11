@@ -21,6 +21,11 @@
         "**/node_modules": true,
         "**/.build": true,
         "**/BP/scripts": true,
+        "**/BP/manifest.json": true,
+        "**/BP/pack_icon.png": true,
+        "**/RP/manifest.json": true,
+        "**/RP/pack_icon.png": true,
+        "**/RP/textures/**/pack_icon.png": true,
         "**/lib": true,
         "**/pnpm-lock.yaml": true
     },
