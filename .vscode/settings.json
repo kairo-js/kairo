@@ -1,0 +1,33 @@
+{
+    "editor.formatOnSave": true,
+
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+    "[typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    },
+
+    "files.exclude": {
+        "**/node_modules": true,
+        "**/.build": true,
+        "**/BP/scripts": true,
+        "**/lib": true,
+        "**/pnpm-lock.yaml": true
+    },
+
+    "js/ts.tsdk.path": "node_modules/typescript/lib",
+
+    "js/ts.preferences.importModuleSpecifier": "shortest",
+
+    "js/ts.updateImportsOnFileMove.enabled": "always"
+}

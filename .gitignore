@@ -1,10 +1,21 @@
+# dependencies
 node_modules/
 package-lock.json
+
+# build output
+BP/scripts/
 BP/scripts/
 BP/manifest.json
-BP/pack_icon.png
 RP/manifest.json
+BP/pack_icon.png
 RP/pack_icon.png
 RP/textures/*/pack_icon.png
+
+# generated files
 src/.manifest-version.json
 src/.uuid.json
+
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json

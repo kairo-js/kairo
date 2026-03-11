@@ -2,7 +2,7 @@
     // Visit https://aka.ms/tsconfig to read more about this file
     "compilerOptions": {
         // File Layout
-        "rootDir": "scripts",
+        "rootDir": "src",
         "outDir": "./BP/scripts",
 
         // Environment Settings
@@ -42,5 +42,5 @@
         "moduleDetection": "force",
         "skipLibCheck": true
     },
-    "include": ["scripts/**/*"]
+    "include": ["src/**/*"]
 }

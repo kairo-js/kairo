@@ -7,8 +7,8 @@
     "packageManager": "pnpm@10.31.0",
     "scripts": {
         "typecheck": "tsc --noEmit",
-        "build": "rimraf BP/scripts && pnpm run typecheck && node build.mjs && pnpm run deploy",
-        "deploy": "node src/deploy.js"
+        "build": "rimraf BP/scripts && pnpm run typecheck && node .build/build.mjs && pnpm run deploy",
+        "deploy": "node .build/deploy.js"
     },
     "repository": {
         "type": "git",
