@@ -1,6 +1,6 @@
+import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
-import { randomUUID } from "crypto";
 import { pathToFileURL } from "url";
 
 const UUID_STORE_FILE = ".uuid.json";
@@ -11,8 +11,8 @@ const DEFAULT_BP_DEPENDENCIES = {
     "@minecraft/server-ui": "2.0.0",
 };
 
-const uuidStorePath = (rootDir) => path.join(rootDir, "src", UUID_STORE_FILE);
-const versionStorePath = (rootDir) => path.join(rootDir, "src", VERSION_STORE_FILE);
+const uuidStorePath = (rootDir) => path.join(rootDir, ".build", UUID_STORE_FILE);
+const versionStorePath = (rootDir) => path.join(rootDir, ".build", VERSION_STORE_FILE);
 
 function toVersionString(v) {
     return `${v.major}.${v.minor}.${v.patch}`;
