@@ -9,7 +9,7 @@
         // See also https://aka.ms/tsconfig/module
         "module": "ESNext",
         "target": "ES2020",
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "types": ["node", "@minecraft/server", "@minecraft/server-ui"],
         // For nodejs:
         // "lib": ["esnext"],

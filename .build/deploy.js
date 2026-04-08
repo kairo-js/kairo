@@ -1,10 +1,10 @@
-import path from "path";
-import os from "os";
 import fs from "fs";
 import fse from "fs-extra";
+import os from "os";
+import path from "path";
 import { fileURLToPath } from "url";
-import { writeManifests } from "./generate-manifest.js";
 import { writePackIcon } from "./copy-pack_icon.js";
+import { writeManifests } from "./generate-manifest.js";
 import { getSafeFolderName } from "./path-utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,6 +24,20 @@ function resolveMinecraftDevPath(addonName, type) {
         type === "behavior" ? "development_behavior_packs" : "development_resource_packs",
         addonName,
     );
+}
+
+function replacePathWithJunction(targetPath, linkPath) {
+    if (fs.existsSync(linkPath)) {
+        const stat = fs.lstatSync(linkPath);
+        if (stat.isDirectory() && !stat.isSymbolicLink()) {
+            fse.emptyDirSync(linkPath);
+        }
+        fs.rmSync(linkPath, { recursive: true, force: true });
+    }
+
+    const linkParent = path.dirname(linkPath);
+    fse.ensureDirSync(linkParent);
+    fs.symlinkSync(targetPath, linkPath, "junction");
 }
 
 async function main() {
@@ -48,10 +62,8 @@ async function main() {
 
     const bpDir = path.join(rootDir, "BP");
     const dstBP = resolveMinecraftDevPath(safeFolderName, "behavior");
-    fse.ensureDirSync(dstBP);
-    fse.emptyDirSync(dstBP);
-    fse.copySync(bpDir, dstBP, { overwrite: true });
-    console.log(`[deploy] BP => ${dstBP}`);
+    replacePathWithJunction(bpDir, dstBP);
+    console.log(`[deploy] BP junction => ${dstBP} -> ${bpDir}`);
 
     if (rpManifest) {
         const rpDisplayName = rpManifest.header?.name;
@@ -59,11 +71,9 @@ async function main() {
 
         const rpDir = path.join(rootDir, "RP");
         const dstRP = resolveMinecraftDevPath(safeFolderName, "resource");
-        fse.ensureDirSync(dstRP);
-        fse.emptyDirSync(dstRP);
-        fse.copySync(rpDir, dstRP, { overwrite: true });
+        replacePathWithJunction(rpDir, dstRP);
 
-        console.log(`[deploy] RP => ${dstRP}`);
+        console.log(`[deploy] RP junction => ${dstRP} -> ${rpDir}`);
         console.log(`[deploy] ${bpDisplayName} (${safeFolderName}) ${versionString} deployed.`);
     } else {
         console.log(
