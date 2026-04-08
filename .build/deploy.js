@@ -1,3 +1,4 @@
+import { spawnSync } from "child_process";
 import fs from "fs";
 import fse from "fs-extra";
 import os from "os";
@@ -26,6 +27,16 @@ function resolveMinecraftDevPath(addonName, type) {
     );
 }
 
+function setHiddenAttributeWindows(targetPath) {
+    const result = spawnSync("attrib", ["+h", targetPath, "/l"], { stdio: "pipe" });
+    if (result.status !== 0) {
+        const stderr = result.stderr?.toString().trim();
+        const stdout = result.stdout?.toString().trim();
+        const detail = stderr || stdout || `exit code ${result.status}`;
+        throw new Error(`Failed to set hidden attribute: ${detail}`);
+    }
+}
+
 function replacePathWithJunction(targetPath, linkPath) {
     if (fs.existsSync(linkPath)) {
         const stat = fs.lstatSync(linkPath);
@@ -38,6 +49,7 @@ function replacePathWithJunction(targetPath, linkPath) {
     const linkParent = path.dirname(linkPath);
     fse.ensureDirSync(linkParent);
     fs.symlinkSync(targetPath, linkPath, "junction");
+    setHiddenAttributeWindows(linkPath);
 }
 
 async function main() {

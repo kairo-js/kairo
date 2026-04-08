@@ -12,8 +12,8 @@ RP/pack_icon.png
 RP/textures/*/pack_icon.png
 
 # generated files
-src/.manifest-version.json
-src/.uuid.json
+.build/.manifest-version.json
+.build/.uuid.json
 
 # VSCode
 .vscode/*
