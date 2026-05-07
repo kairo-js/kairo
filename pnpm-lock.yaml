@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@kairo-js/router':
+        specifier: 0.2.0-beta.0
+        version: 0.2.0-beta.0(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))
     devDependencies:
       '@minecraft/common':
         specifier: ^1.2.0
@@ -224,6 +228,15 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@fastify/merge-json-schemas@0.2.1':
+    resolution: {integrity: sha512-OA3KGBCy6KtIvLf8DINC5880o5iBlDX4SxzLQS8HorJAbqluzLRn80UXU0bxZn7UOFhFgpRJDasfwn9nG4FG4A==}
+
+  '@kairo-js/router@0.2.0-beta.0':
+    resolution: {integrity: sha512-hdeX2XlsFVg6HXg3NCtQ2QQQ3E2PVVJ/MvSHtXsc5U9IsCa+rZJuMTJEQWpSkamtejBgk86gveszDm/k9tZxXw==}
+    peerDependencies:
+      '@minecraft/server': ^2.5.0
+      '@minecraft/server-ui': ^2.0.0
+
   '@minecraft/common@1.2.0':
     resolution: {integrity: sha512-JdmEq4P3Z/FtoBzhLijFgMSVFnFRrUoLwY8DHHrgtFo0mfLTOLTB1RErYjLMsA6b7BGVNxkX/pfFRiH7QZ0XwQ==}
 
@@ -278,8 +291,22 @@ packages:
   '@minecraft/vanilla-data@1.26.2':
     resolution: {integrity: sha512-nxACCFgbcE9D5Z5vRnl/AtJljat7yC4vKzZ/t87iHqdersZlDhBzUnfBDH4d1F6Le5vgdSEUIJwUJxKR+Yc3+w==}
 
+  '@sinclair/typebox@0.34.49':
+    resolution: {integrity: sha512-brySQQs7Jtn0joV8Xh9ZV/hZb9Ozb0pmazDIASBkYKCjXrXU3mpcFahmK/z4YDhGkQvP9mWJbVyahdtU5wQA+A==}
+
   '@types/node@24.12.0':
     resolution: {integrity: sha512-GYDxsZi3ChgmckRT9HPU0WEhKLP08ev/Yfcq2AstjrDASOYCSXeyjDsHg4v5t4jOj7cyDX3vmprafKlWIG9MXQ==}
+
+  ajv-formats@3.0.1:
+    resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
+    peerDependencies:
+      ajv: ^8.0.0
+    peerDependenciesMeta:
+      ajv:
+        optional: true
+
+  ajv@8.20.0:
+    resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
 
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
@@ -289,10 +316,23 @@ packages:
     resolution: {integrity: sha512-h+DEnpVvxmfVefa4jFbCf5HdH5YMDXRsmKflpf1pILZWRFlTbJpxeU55nJl4Smt5HQaGzg1o6RHFPJaOqnmBDg==}
     engines: {node: 18 || 20 || >=22}
 
+  dequal@2.0.3:
+    resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
+    engines: {node: '>=6'}
+
   esbuild@0.27.3:
     resolution: {integrity: sha512-8VwMnyGCONIs6cWue2IdpHxHnAjzxnw2Zr7MkVxB2vjmQ2ivqGFb4LEG3SMnv0Gb2F/G/2yA8zUaiL1gywDCCg==}
     engines: {node: '>=18'}
     hasBin: true
+
+  fast-deep-equal@3.1.3:
+    resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
+
+  fast-json-stringify@6.4.0:
+    resolution: {integrity: sha512-ibRCQ0GZKJIQ+P3Et1h0LhPgp3PMTYk0MH8O+kW3lNYsvmaQww5Nn3f1jf73Q0jR1Yz3a1CDP4/NZD3vOajWJQ==}
+
+  fast-uri@3.1.2:
+    resolution: {integrity: sha512-rVjf7ArG3LTk+FS6Yw81V1DLuZl1bRbNrev6Tmd/9RaroeeRRJhAt7jg/6YFxbvAQXUCavSoZhPPj6oOx+5KjQ==}
 
   fs-extra@11.3.4:
     resolution: {integrity: sha512-CTXd6rk/M3/ULNQj8FBqBWHYBVYybQ3VPBw0xGKFe3tuH7ytT6ACnvzpIQ3UZtB8yvUKC2cXn1a+x+5EVQLovA==}
@@ -304,6 +344,12 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
+
+  json-schema-ref-resolver@3.0.0:
+    resolution: {integrity: sha512-hOrZIVL5jyYFjzk7+y7n5JDzGlU8rfWDuYyHwGa2WA8/pcmMHezp2xsVwxrebD/Q9t8Nc5DboieySDpCp4WG4A==}
+
+  json-schema-traverse@1.0.0:
+    resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
 
   jsonfile@6.2.0:
     resolution: {integrity: sha512-FGuPw30AdOIUTRMC2OMRtQV+jkVj2cfPqSeWXv1NEAJ1qZ5zb1X6z1mFhbfOB/iy3ssJCD+3KuZ8r8C3uVFlAg==}
@@ -332,10 +378,20 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
 
+  require-from-string@2.0.2:
+    resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
+    engines: {node: '>=0.10.0'}
+
+  rfdc@1.4.1:
+    resolution: {integrity: sha512-q1b3N5QkRUWUl7iyylaaj3kOpIT0N2i9MqIEQXP73GVsN9cw3fdx8X63cEmWhJGi2PPCF23Ijp7ktmd39rawIA==}
+
   rimraf@6.1.3:
     resolution: {integrity: sha512-LKg+Cr2ZF61fkcaK1UdkH2yEBBKnYjTyWzTJT6KNPcSPaiT7HSdhtMXQuN5wkTX0Xu72KQ1l8S42rlmexS2hSA==}
     engines: {node: 20 || >=22}
     hasBin: true
+
+  seedrandom@3.0.5:
+    resolution: {integrity: sha512-8OwmbklUNzwezjGInmZ+2clQmExQPvomqjL7LFqOYqtmuxRgQYqOD3mHaU+MvZn5FLUeVxVfQjwLZW/n/JFuqg==}
 
   typescript@5.9.3:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
@@ -429,6 +485,19 @@ snapshots:
   '@esbuild/win32-x64@0.27.3':
     optional: true
 
+  '@fastify/merge-json-schemas@0.2.1':
+    dependencies:
+      dequal: 2.0.3
+
+  '@kairo-js/router@0.2.0-beta.0(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))':
+    dependencies:
+      '@minecraft/server': 2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2)
+      '@minecraft/server-ui': 2.0.0(@minecraft/vanilla-data@1.26.2)
+      '@sinclair/typebox': 0.34.49
+      ajv: 8.20.0
+      fast-json-stringify: 6.4.0
+      seedrandom: 3.0.5
+
   '@minecraft/common@1.2.0': {}
 
   '@minecraft/debug-utilities@1.0.0-beta.1.20.70-preview.20(@minecraft/vanilla-data@1.26.2)':
@@ -493,15 +562,30 @@ snapshots:
 
   '@minecraft/vanilla-data@1.26.2': {}
 
+  '@sinclair/typebox@0.34.49': {}
+
   '@types/node@24.12.0':
     dependencies:
       undici-types: 7.16.0
+
+  ajv-formats@3.0.1(ajv@8.20.0):
+    optionalDependencies:
+      ajv: 8.20.0
+
+  ajv@8.20.0:
+    dependencies:
+      fast-deep-equal: 3.1.3
+      fast-uri: 3.1.2
+      json-schema-traverse: 1.0.0
+      require-from-string: 2.0.2
 
   balanced-match@4.0.4: {}
 
   brace-expansion@5.0.4:
     dependencies:
       balanced-match: 4.0.4
+
+  dequal@2.0.3: {}
 
   esbuild@0.27.3:
     optionalDependencies:
@@ -532,6 +616,19 @@ snapshots:
       '@esbuild/win32-ia32': 0.27.3
       '@esbuild/win32-x64': 0.27.3
 
+  fast-deep-equal@3.1.3: {}
+
+  fast-json-stringify@6.4.0:
+    dependencies:
+      '@fastify/merge-json-schemas': 0.2.1
+      ajv: 8.20.0
+      ajv-formats: 3.0.1(ajv@8.20.0)
+      fast-uri: 3.1.2
+      json-schema-ref-resolver: 3.0.0
+      rfdc: 1.4.1
+
+  fast-uri@3.1.2: {}
+
   fs-extra@11.3.4:
     dependencies:
       graceful-fs: 4.2.11
@@ -545,6 +642,12 @@ snapshots:
       path-scurry: 2.0.2
 
   graceful-fs@4.2.11: {}
+
+  json-schema-ref-resolver@3.0.0:
+    dependencies:
+      dequal: 2.0.3
+
+  json-schema-traverse@1.0.0: {}
 
   jsonfile@6.2.0:
     dependencies:
@@ -569,10 +672,16 @@ snapshots:
 
   prettier@3.6.2: {}
 
+  require-from-string@2.0.2: {}
+
+  rfdc@1.4.1: {}
+
   rimraf@6.1.3:
     dependencies:
       glob: 13.0.6
       package-json-from-dist: 1.0.1
+
+  seedrandom@3.0.5: {}
 
   typescript@5.9.3: {}
 

@@ -1,4 +1,6 @@
-export const properties: KairoAddonProperties = {
+import { MinecraftModule, SupportedTag, type AddonProperties } from "@kairo-js/router";
+
+export const properties: AddonProperties = {
     id: "kairo", //# // a-z & 0-9 - _
     metadata: {
         authors: ["shizuku86"],
@@ -14,15 +16,15 @@ export const properties: KairoAddonProperties = {
             // prerelease: "preview.1",
             // build: "abc123",
         },
-        min_engine_version: [1, 21, 132],
+        min_engine_version: { major: 1, minor: 21, patch: 132 },
     },
     dependencies: [
         {
-            module_name: "@minecraft/server",
+            module_name: MinecraftModule.Server,
             version: "2.4.0",
         },
         {
-            module_name: "@minecraft/server-ui",
+            module_name: MinecraftModule.ServerUi,
             version: "2.0.0",
         },
     ],
@@ -32,49 +34,5 @@ export const properties: KairoAddonProperties = {
          * id: version (string) // "kairo": "1.0.0"
          */
     },
-    tags: ["official", "stable"],
-};
-
-export type SemVer = {
-    readonly major: number;
-    readonly minor: number;
-    readonly patch: number;
-    readonly prerelease?: string;
-    readonly build?: string;
-};
-
-export type EngineVersion = [number, number, number];
-
-export type ManifestDependency = {
-    readonly module_name: "@minecraft/server" | "@minecraft/server-ui";
-    readonly version: string;
-};
-
-export type AddonHeader = {
-    readonly name: string;
-    readonly description: string;
-    readonly version: SemVer;
-    readonly min_engine_version: EngineVersion;
-};
-
-export type AddonMetadata = {
-    readonly authors?: string[];
-    readonly url?: string;
-    readonly license?: string;
-};
-
-export type RequiredAddons = {
-    readonly [addonId: string]: string;
-};
-
-export const SupportedTagValues = ["official", "approved", "stable", "experimental"] as const;
-export type SupportedTag = (typeof SupportedTagValues)[number];
-
-export type KairoAddonProperties = {
-    readonly id: string;
-    readonly metadata?: AddonMetadata;
-    readonly header: AddonHeader;
-    readonly dependencies?: ManifestDependency[];
-    readonly requiredAddons?: RequiredAddons;
-    readonly tags?: SupportedTag[];
+    tags: [SupportedTag.Official, SupportedTag.Stable],
 };
