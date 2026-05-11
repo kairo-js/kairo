@@ -109,7 +109,7 @@ function buildCommon(header, metadata, version, kairoVersion) {
             name: header.name,
             description: header.description,
             version: toVersionString(version),
-            min_engine_version: header.min_engine_version,
+            min_engine_version: toManifestTriple(header.min_engine_version),
         },
     };
 }

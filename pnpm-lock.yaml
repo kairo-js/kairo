@@ -8,9 +8,15 @@ importers:
 
   .:
     dependencies:
+      '@kairo-js/properties':
+        specifier: ^1.0.1
+        version: 1.0.1
       '@kairo-js/router':
-        specifier: 0.2.0-beta.0
-        version: 0.2.0-beta.0(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))
+        specifier: 0.2.0-beta.17
+        version: 0.2.0-beta.17(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))
+      '@kairo-js/utils':
+        specifier: ^1.0.1
+        version: 1.0.1
       '@sinclair/typebox':
         specifier: ^0.34.49
         version: 0.34.49
@@ -249,11 +255,20 @@ packages:
   '@fastify/merge-json-schemas@0.2.1':
     resolution: {integrity: sha512-OA3KGBCy6KtIvLf8DINC5880o5iBlDX4SxzLQS8HorJAbqluzLRn80UXU0bxZn7UOFhFgpRJDasfwn9nG4FG4A==}
 
-  '@kairo-js/router@0.2.0-beta.0':
-    resolution: {integrity: sha512-hdeX2XlsFVg6HXg3NCtQ2QQQ3E2PVVJ/MvSHtXsc5U9IsCa+rZJuMTJEQWpSkamtejBgk86gveszDm/k9tZxXw==}
+  '@kairo-js/properties@1.0.1':
+    resolution: {integrity: sha512-d0hmONG765g2AJEkYmV2qBseK/SaeQnZ3PlDfMEqay2DJW/PLypCt6aItQFr7xyCl2vzPfXbagaKa1Zgzgl9FQ==}
+
+  '@kairo-js/properties@1.0.2':
+    resolution: {integrity: sha512-5gLkGPjOulIZL3WNKrM0CXHtMBA/gtqM1xXZCPWAB1jekGv3aOKoCo6nFgzyVnz1LuORS6LhrUErO+q3FDAs0A==}
+
+  '@kairo-js/router@0.2.0-beta.17':
+    resolution: {integrity: sha512-EvjDjZPn+ryLjE0+stuGr4TfBPYNLAH7nOnKDDJdmUeXEIeJRX3OXFl2Sj21K2tmqRLTWWHZihgFmnzDuNc/pg==}
     peerDependencies:
       '@minecraft/server': ^2.5.0
       '@minecraft/server-ui': ^2.0.0
+
+  '@kairo-js/utils@1.0.1':
+    resolution: {integrity: sha512-JMP4LmmD4DfxhvNst45fMXXMuzTyJgq2siTzgx5/OXuJDvgpz9YMx9L3GqpE3nCq9Dl/+UmLULsg3hCNfniCrg==}
 
   '@minecraft/common@1.2.0':
     resolution: {integrity: sha512-JdmEq4P3Z/FtoBzhLijFgMSVFnFRrUoLwY8DHHrgtFo0mfLTOLTB1RErYjLMsA6b7BGVNxkX/pfFRiH7QZ0XwQ==}
@@ -588,13 +603,24 @@ snapshots:
     dependencies:
       dequal: 2.0.3
 
-  '@kairo-js/router@0.2.0-beta.0(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))':
+  '@kairo-js/properties@1.0.1': {}
+
+  '@kairo-js/properties@1.0.2': {}
+
+  '@kairo-js/router@0.2.0-beta.17(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))':
     dependencies:
+      '@kairo-js/properties': 1.0.2
+      '@kairo-js/utils': 1.0.1
       '@minecraft/server': 2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2)
       '@minecraft/server-ui': 2.0.0(@minecraft/vanilla-data@1.26.2)
       '@sinclair/typebox': 0.34.49
       ajv: 8.20.0
       fast-json-stringify: 6.4.0
+      seedrandom: 3.0.5
+
+  '@kairo-js/utils@1.0.1':
+    dependencies:
+      ajv: 8.20.0
       seedrandom: 3.0.5
 
   '@minecraft/common@1.2.0': {}

@@ -4,7 +4,7 @@ await esbuild.build({
     entryPoints: ["src/index.ts", "src/properties.ts"],
     bundle: true,
     format: "esm",
-    platform: "neutral",
+    platform: "node",
     target: "es2020",
     outdir: "BP/scripts",
     sourcemap: false,

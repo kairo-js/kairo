@@ -1,4 +1,4 @@
-import { MinecraftModule, SupportedTag, type AddonProperties } from "@kairo-js/router";
+import type { AddonProperties } from "@kairo-js/properties";
 
 export const properties: AddonProperties = {
     id: "kairo", //# // a-z & 0-9 - _
@@ -20,11 +20,11 @@ export const properties: AddonProperties = {
     },
     dependencies: [
         {
-            module_name: MinecraftModule.Server,
-            version: "2.4.0",
+            module_name: "@minecraft/server",
+            version: "2.5.0",
         },
         {
-            module_name: MinecraftModule.ServerUi,
+            module_name: "@minecraft/server-ui",
             version: "2.0.0",
         },
     ],
@@ -34,5 +34,5 @@ export const properties: AddonProperties = {
          * id: version (string) // "kairo": "1.0.0"
          */
     },
-    tags: [SupportedTag.Official, SupportedTag.Stable],
+    tags: ["official", "stable"],
 };

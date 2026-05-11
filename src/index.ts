@@ -1,6 +1,5 @@
-import { router } from "@kairo-js/router";
 import { kairo } from "./kairo/Kairo";
 import { properties } from "./properties";
 
 kairo.init();
-router.init(properties);
+kairo.router.init(properties);
