@@ -2,11 +2,13 @@ import type { Disposable } from "@kairo-js/router";
 import { type Random } from "@kairo-js/utils";
 import type { KairoRuntime } from "../../minecraft/KairoRuntime";
 import { KairoInitError, KairoInitErrorReason } from "../errors/KairoInitError";
+import type { KairoRegistryIndex } from "../KairoRegistryIndex";
 import { KairoInitEventId } from "./constants/KairoInitEventId";
 import { DiscoveryController } from "./discovery/DiscoveryController";
 import { IdRegistryProvider } from "./IdRegistryProvider";
 import { KairoIdVerifier } from "./KairoIdVerifier";
 import { KairoInitListener } from "./KairoInitListener";
+import { KairoRegistryVerifier } from "./KairoRegistryVerifier";
 import { RegistrationController } from "./registratoin/RegistrationController";
 
 enum InitPhase {
@@ -22,6 +24,7 @@ export class KairoInitializer implements Disposable {
 
     private readonly idRegistryProvider: IdRegistryProvider;
     private readonly kairoIdVerifier: KairoIdVerifier;
+    private readonly kairoRegistryVerifier: KairoRegistryVerifier;
 
     private readonly initListener: KairoInitListener;
     private readonly discoveryController: DiscoveryController;
@@ -29,16 +32,23 @@ export class KairoInitializer implements Disposable {
 
     private readonly DISCOVERY_RESPONSE_TIMEOUT_TICKS = 10;
     private readonly pendingDiscoveryResponses: string[] = [];
+
+    private readonly REGISTRATION_RESPONSE_TIMEOUT_TICKS = 10;
     constructor(
         private readonly runtime: KairoRuntime,
         private readonly random: Random,
+        private readonly registryIndex: KairoRegistryIndex,
         private readonly onCompleted?: () => void,
         private readonly onDisposed?: () => void,
     ) {
         this.idRegistryProvider = new IdRegistryProvider(this.random);
         this.kairoIdVerifier = new KairoIdVerifier();
+        this.kairoRegistryVerifier = new KairoRegistryVerifier(this.registryIndex);
         this.discoveryController = new DiscoveryController();
-        this.registrationController = new RegistrationController();
+        this.registrationController = new RegistrationController(
+            this.registryIndex,
+            this.kairoRegistryVerifier,
+        );
 
         this.initListener = new KairoInitListener({
             [KairoInitEventId.DiscoveryResponse]: this.handleDiscoveryResponse,
@@ -79,6 +89,18 @@ export class KairoInitializer implements Disposable {
         this.registrationController.handleDiscoveryComplete(approvals, rejects, {
             runtime: this.runtime,
         });
+
+        this.runtime.waitTicks(this.REGISTRATION_RESPONSE_TIMEOUT_TICKS).then(() => {
+            this.assertNotDisposed();
+
+            if (this.phase !== InitPhase.Registration) {
+                throw new KairoInitError(KairoInitErrorReason.InvalidPhase);
+            }
+
+            this.phase = InitPhase.Completed;
+            this.dispose();
+            this.onCompleted?.();
+        });
     }
 
     dispose(): void {
@@ -112,6 +134,9 @@ export class KairoInitializer implements Disposable {
         this.assertPhase(InitPhase.Registration);
 
         try {
+            this.registrationController.handleRegistrationResponse(message, {
+                runtime: this.runtime,
+            });
         } catch (error) {
             this.dispose();
             throw error;
