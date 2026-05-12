@@ -1,6 +1,6 @@
 import { toError } from "@kairo-js/utils";
 import type { KairoRuntime } from "../../../minecraft/KairoRuntime";
-import { KairoInitEventId } from "../KairoInitEventId";
+import { KairoInitEventId } from "../constants/KairoInitEventId";
 import {
     DiscoveryQueryBroadcasterError,
     DiscoveryQueryBroadcasterErrorReason,
@@ -11,7 +11,7 @@ import { stringifyDiscoveryQuery } from "./query/stringify";
 export class DiscoveryQueryBroadcaster {
     constructor() {}
 
-    broadcast(runtime: KairoRuntime, registryId: string): void {
+    broadcast(registryId: string, runtime: KairoRuntime): void {
         const query: DiscoveryQuery = {
             registryId,
             timestamp: runtime.currentTick(),

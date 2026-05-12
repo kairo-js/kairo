@@ -7,18 +7,12 @@ import {
 } from "@minecraft/server";
 
 export class KairoRuntime {
-    public readonly registry = {
-        has(id: string): boolean {
-            return world.scoreboard.getObjective(id) !== undefined;
-        },
-
-        add(id: string, displayName: string): void {
-            world.scoreboard.addObjective(id, displayName);
-        },
-    };
-
     currentTick(): number {
         return system.currentTick;
+    }
+
+    waitTicks(ticks: number): Promise<void> {
+        return system.waitTicks(ticks);
     }
 
     send(id: string, message: string): void {
@@ -36,5 +30,35 @@ export class KairoRuntime {
         return {
             dispose: () => system.afterEvents.scriptEventReceive.unsubscribe(listener),
         };
+    }
+
+    getRegistry(id: string): {
+        id: string;
+        displayName: string;
+        has(displayName: string): boolean;
+    } {
+        if (!this.hasRegistry(id)) {
+            throw new Error(`Objective with id "${id}" does not exist.`);
+        }
+        const objective = world.scoreboard.getObjective(id)!;
+        return {
+            id: objective.id,
+            displayName: objective.displayName,
+            has(displayName: string): boolean {
+                return objective.hasParticipant(displayName);
+            },
+        };
+    }
+
+    hasRegistry(id: string): boolean {
+        return world.scoreboard.getObjective(id) !== undefined;
+    }
+
+    addRegistry(id: string, displayName: string): void {
+        world.scoreboard.addObjective(id, displayName);
+    }
+
+    removeRegistry(id: string): void {
+        world.scoreboard.removeObjective(id);
     }
 }

@@ -1,4 +1,5 @@
 import { KairoRouter, router } from "@kairo-js/router";
+import { SeedRandom } from "@kairo-js/utils";
 import { KairoRuntime } from "../minecraft/KairoRuntime";
 import { KairoInitializer } from "./init/KairoInitializer";
 
@@ -8,9 +9,9 @@ class Kairo {
     init(): void {
         this.runtime = new KairoRuntime();
 
-        const initializer = new KairoInitializer(this.runtime);
-        initializer.setup();
+        const initializer = new KairoInitializer(this.runtime, new SeedRandom());
         this.router.waitForWorldLoad().then(() => {
+            initializer.setup();
             initializer.onWorldLoad();
         });
     }

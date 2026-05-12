@@ -12,8 +12,8 @@ importers:
         specifier: ^1.0.1
         version: 1.0.1
       '@kairo-js/router':
-        specifier: 0.2.0-beta.17
-        version: 0.2.0-beta.17(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))
+        specifier: 0.2.0-beta.19
+        version: 0.2.0-beta.19(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))
       '@kairo-js/utils':
         specifier: ^1.0.1
         version: 1.0.1
@@ -261,8 +261,8 @@ packages:
   '@kairo-js/properties@1.0.2':
     resolution: {integrity: sha512-5gLkGPjOulIZL3WNKrM0CXHtMBA/gtqM1xXZCPWAB1jekGv3aOKoCo6nFgzyVnz1LuORS6LhrUErO+q3FDAs0A==}
 
-  '@kairo-js/router@0.2.0-beta.17':
-    resolution: {integrity: sha512-EvjDjZPn+ryLjE0+stuGr4TfBPYNLAH7nOnKDDJdmUeXEIeJRX3OXFl2Sj21K2tmqRLTWWHZihgFmnzDuNc/pg==}
+  '@kairo-js/router@0.2.0-beta.19':
+    resolution: {integrity: sha512-jVqb801RLSbIRM9roxLHrI48R9gsh0tbSBKP+oWxhMCUPUDVkE9hEmbPWkHQ1F8v0Dzs0+ejUGN9BwGTkPQ6bQ==}
     peerDependencies:
       '@minecraft/server': ^2.5.0
       '@minecraft/server-ui': ^2.0.0
@@ -607,7 +607,7 @@ snapshots:
 
   '@kairo-js/properties@1.0.2': {}
 
-  '@kairo-js/router@0.2.0-beta.17(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))':
+  '@kairo-js/router@0.2.0-beta.19(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.5.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))':
     dependencies:
       '@kairo-js/properties': 1.0.2
       '@kairo-js/utils': 1.0.1

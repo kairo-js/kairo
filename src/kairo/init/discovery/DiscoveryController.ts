@@ -1,15 +1,24 @@
 import type { KairoRuntime } from "../../../minecraft/KairoRuntime";
-import type { IdRegistryProvider } from "../IdRegistryProvider";
+import { AddonDiscoveryManager } from "./AddonDiscoveryManager";
 import { DiscoveryQueryBroadcaster } from "./DiscoveryQueryBroadcaster";
 
 export class DiscoveryController {
     private readonly discoveryQueryBroadcaster: DiscoveryQueryBroadcaster;
-    constructor(private readonly idRegistryProvider: IdRegistryProvider) {
+    private readonly discoveryManager: AddonDiscoveryManager;
+    constructor() {
         this.discoveryQueryBroadcaster = new DiscoveryQueryBroadcaster();
+        this.discoveryManager = new AddonDiscoveryManager();
     }
 
-    handleOnWorldLoad(deps: { runtime: KairoRuntime }): void {
-        const registryId = this.idRegistryProvider.provideRegistry(deps.runtime);
-        this.discoveryQueryBroadcaster.broadcast(deps.runtime, registryId);
+    handleOnWorldLoad(registryId: string, deps: { runtime: KairoRuntime }): void {
+        this.discoveryQueryBroadcaster.broadcast(registryId, deps.runtime);
+    }
+
+    handleDiscoveryResponse(
+        message: string,
+        deps: { runtime: KairoRuntime; pendingArray: string[] },
+    ): void {
+        const kairoId = this.discoveryManager.resolveKairoId(message, deps.runtime.currentTick());
+        deps.pendingArray.push(kairoId);
     }
 }

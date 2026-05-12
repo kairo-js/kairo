@@ -25,9 +25,9 @@ export class IdRegistryProvider {
             if (attempts > 100) {
                 throw new ProvideIdRegistryError(ProvideIdRegistryErrorReason.IdGenerationFailed);
             }
-        } while (runtime.registry.has(registryId));
+        } while (runtime.hasRegistry(registryId));
 
-        runtime.registry.add(registryId, "kairo:id_checker");
+        runtime.addRegistry(registryId, "kairo:id_checker");
         return registryId;
     }
 
