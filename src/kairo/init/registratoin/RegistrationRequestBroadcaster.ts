@@ -21,7 +21,6 @@ export class RegistrationRequestBroadcaster {
         try {
             const requestStr = stringifyRegistrationRequest(request);
 
-            console.log("aiueo");
             runtime.send(KairoInitEventId.RegistrationRequest, requestStr);
         } catch (e: unknown) {
             throw new RegistrationRequestBroadcasterError(

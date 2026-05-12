@@ -1,6 +1,4 @@
 import { compile } from "@kairo-js/utils";
-import { RegistrationResponseSchema, type RegistrationResponse } from "./schema";
+import { RegistrationResponseSchema } from "./schema";
 
-export const validateRegistrationResponse = compile<RegistrationResponse>(
-    RegistrationResponseSchema,
-);
+export const validateRegistrationResponse = compile(RegistrationResponseSchema);

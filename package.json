@@ -34,7 +34,6 @@
         "@minecraft/vanilla-data": "^1.26.2",
         "@types/node": "^24.12.0",
         "@types/seedrandom": "^3.0.8",
-        "ajv-cli": "^5.0.0",
         "esbuild": "^0.27.3",
         "fs-extra": "^11.3.4",
         "prettier": "3.6.2",
@@ -43,10 +42,9 @@
     },
     "dependencies": {
         "@kairo-js/properties": "^1.0.1",
-        "@kairo-js/router": "0.2.0-beta.19",
-        "@kairo-js/utils": "^1.0.1",
+        "@kairo-js/router": "0.2.0-beta.20",
+        "@kairo-js/utils": "^1.1.2",
         "@sinclair/typebox": "^0.34.49",
-        "ajv": "^8.18.0",
         "fast-json-stringify": "^6.3.0",
         "seedrandom": "^3.0.5"
     }
