@@ -1,5 +1,5 @@
 import { validateTimestamp } from "@kairo-js/utils";
-import { DiscoveryResponseError, DiscoveryResponseErrorReason } from "./errors";
+import { DiscoveryResponseError, DiscoveryResponseErrorReason } from "./response/errors";
 import type { DiscoveryResponse } from "./response/schema";
 
 export class DiscoveryResponseValidator {
