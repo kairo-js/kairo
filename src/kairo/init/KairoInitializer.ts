@@ -22,31 +22,31 @@ export class KairoInitializer implements Disposable {
     private subscription?: Disposable;
     private phase = InitPhase.Discovery;
 
-    private readonly idRegistryProvider: IdRegistryProvider;
-    private readonly kairoIdVerifier: KairoIdVerifier;
-    private readonly kairoRegistryVerifier: KairoRegistryVerifier;
+    private idRegistryProvider?: IdRegistryProvider;
+    private kairoIdVerifier?: KairoIdVerifier;
+    private kairoRegistryVerifier?: KairoRegistryVerifier;
 
-    private readonly initListener: KairoInitListener;
-    private readonly discoveryController: DiscoveryController;
-    private readonly registrationController: RegistrationController;
+    private initListener?: KairoInitListener;
+    private discoveryController?: DiscoveryController;
+    private registrationController?: RegistrationController;
 
     private readonly DISCOVERY_RESPONSE_TIMEOUT_TICKS = 10;
-    private readonly pendingDiscoveryResponses: string[] = [];
+    private pendingDiscoveryResponses?: string[] = [];
 
     private readonly REGISTRATION_RESPONSE_TIMEOUT_TICKS = 10;
     constructor(
         private readonly runtime: KairoRuntime,
-        private readonly random: Random,
-        private readonly registryIndex: KairoRegistryIndex,
+        random: Random,
+        registryIndex: KairoRegistryIndex,
         private readonly onCompleted?: () => void,
         private readonly onDisposed?: () => void,
     ) {
-        this.idRegistryProvider = new IdRegistryProvider(this.random);
+        this.idRegistryProvider = new IdRegistryProvider(random);
         this.kairoIdVerifier = new KairoIdVerifier();
-        this.kairoRegistryVerifier = new KairoRegistryVerifier(this.registryIndex);
+        this.kairoRegistryVerifier = new KairoRegistryVerifier(registryIndex);
         this.discoveryController = new DiscoveryController();
         this.registrationController = new RegistrationController(
-            this.registryIndex,
+            registryIndex,
             this.kairoRegistryVerifier,
         );
 
@@ -58,12 +58,12 @@ export class KairoInitializer implements Disposable {
 
     setup(): void {
         this.assertNotDisposed();
-        this.subscription = this.initListener.setup(this.runtime);
+        this.subscription = this.initListener!.setup(this.runtime);
     }
 
     onWorldLoad(): void {
-        const registryId = this.idRegistryProvider.provideRegistry(this.runtime);
-        this.discoveryController.handleOnWorldLoad(registryId, { runtime: this.runtime });
+        const registryId = this.idRegistryProvider!.provideRegistry(this.runtime);
+        this.discoveryController!.handleOnWorldLoad(registryId, { runtime: this.runtime });
 
         this.runtime.waitTicks(this.DISCOVERY_RESPONSE_TIMEOUT_TICKS).then(() => {
             this.assertNotDisposed();
@@ -72,8 +72,8 @@ export class KairoInitializer implements Disposable {
                 throw new KairoInitError(KairoInitErrorReason.InvalidPhase);
             }
 
-            const { validIds, rejectedIds } = this.kairoIdVerifier.verify(
-                this.pendingDiscoveryResponses,
+            const { validIds, rejectedIds } = this.kairoIdVerifier!.verify(
+                this.pendingDiscoveryResponses!,
                 registryId,
                 this.runtime,
             );
@@ -86,7 +86,7 @@ export class KairoInitializer implements Disposable {
     }
 
     onDiscoveryComplete(approvals: readonly string[], rejects: readonly string[]): void {
-        this.registrationController.handleDiscoveryComplete(approvals, rejects, {
+        this.registrationController!.handleDiscoveryComplete(approvals, rejects, {
             runtime: this.runtime,
         });
 
@@ -98,6 +98,9 @@ export class KairoInitializer implements Disposable {
             }
 
             this.phase = InitPhase.Completed;
+            this.releaseInitResources();
+
+            // Initialization is complete; activation can begin from the onCompleted callback.
             this.dispose();
             this.onCompleted?.();
         });
@@ -111,18 +114,30 @@ export class KairoInitializer implements Disposable {
         this.subscription?.dispose();
         this.subscription = undefined;
 
+        this.releaseInitResources();
+
         try {
             this.onDisposed?.();
         } catch {}
+    }
+
+    private releaseInitResources(): void {
+        this.idRegistryProvider = undefined;
+        this.kairoIdVerifier = undefined;
+        this.kairoRegistryVerifier = undefined;
+        this.initListener = undefined;
+        this.discoveryController = undefined;
+        this.registrationController = undefined;
+        this.pendingDiscoveryResponses = undefined;
     }
 
     private handleDiscoveryResponse = (message: string): void => {
         this.assertPhase(InitPhase.Discovery);
 
         try {
-            this.discoveryController.handleDiscoveryResponse(message, {
+            this.discoveryController!.handleDiscoveryResponse(message, {
                 runtime: this.runtime,
-                pendingArray: this.pendingDiscoveryResponses,
+                pendingArray: this.pendingDiscoveryResponses!,
             });
         } catch (error) {
             this.dispose();
@@ -134,7 +149,7 @@ export class KairoInitializer implements Disposable {
         this.assertPhase(InitPhase.Registration);
 
         try {
-            this.registrationController.handleRegistrationResponse(message, {
+            this.registrationController!.handleRegistrationResponse(message, {
                 runtime: this.runtime,
             });
         } catch (error) {
