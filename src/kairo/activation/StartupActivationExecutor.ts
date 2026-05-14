@@ -1,5 +1,5 @@
 import type { KairoRegistry } from "@kairo-js/router";
-import type { ActivationState } from "./ActivationState";
+import type { ActivationState, AddonInactiveReason } from "./ActivationState";
 import type { StartupActivationPlan } from "./StartupActivationPlanner";
 import type { ActivationResult } from "./result/schema";
 
@@ -14,39 +14,84 @@ export class StartupActivationExecutor {
     ) {}
 
     async execute(plan: StartupActivationPlan): Promise<void> {
-        for (const u of plan.unresolved) {
-            this.activationState.set(u.registry, "unresolved", "dependency_issue");
+        for (const unresolved of plan.unresolved) {
+            this.activationState.set(unresolved.registry, "unresolved", unresolved.reason);
         }
 
-        for (const i of plan.inactive) {
-            this.activationState.set(i.registry, "inactive", i.reason);
+        for (const inactive of plan.inactive) {
+            this.activationState.set(inactive.registry, "inactive", inactive.reason);
         }
 
-        const failed = new Set<string>();
+        for (const registry of plan.activationOrder) {
+            if (this.hasInactiveDependency(registry)) {
+                this.activationState.set(registry, "inactive", "dependency_inactive");
 
-        for (const r of plan.activationOrder) {
-            if (this.hasFailedDependency(r, failed)) {
-                this.activationState.set(r, "inactive", "dependency_activation_failed");
-                failed.add(r.addonId);
                 continue;
             }
 
-            const res = await this.requester.requestActivation(r.kairoId);
+            if (this.hasUnresolvedDependency(registry)) {
+                this.activationState.set(registry, "inactive", "dependency_unresolved");
 
-            if (res.status === "success") {
-                this.activationState.set(r, "active");
                 continue;
             }
 
-            this.activationState.set(r, "inactive", res.reason ?? "activation_failed");
-            failed.add(r.addonId);
+            const result = await this.requester.requestActivation(registry.kairoId);
+
+            if (result.status === "success") {
+                this.activationState.set(registry, "active");
+
+                continue;
+            }
+
+            if (result.status === "timeout") {
+                this.activationState.set(registry, "inactive", "activation_timeout");
+
+                continue;
+            }
+
+            this.activationState.set(registry, "inactive", result.reason as AddonInactiveReason);
         }
     }
 
-    private hasFailedDependency(registry: KairoRegistry, failed: ReadonlySet<string>): boolean {
-        for (const id of Object.keys(registry.dependencies)) {
-            if (failed.has(id)) return true;
+    private hasInactiveDependency(registry: KairoRegistry): boolean {
+        for (const dependencyId of Object.keys(registry.dependencies)) {
+            const dependency = this.findDependency(dependencyId);
+
+            if (!dependency) {
+                continue;
+            }
+
+            if (this.activationState.isInactive(dependency.kairoId)) {
+                return true;
+            }
         }
+
         return false;
+    }
+
+    private hasUnresolvedDependency(registry: KairoRegistry): boolean {
+        for (const dependencyId of Object.keys(registry.dependencies)) {
+            const dependency = this.findDependency(dependencyId);
+
+            if (!dependency) {
+                continue;
+            }
+
+            if (this.activationState.isUnresolved(dependency.kairoId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private findDependency(addonId: string): KairoRegistry | undefined {
+        for (const entry of this.activationState.getAll()) {
+            if (entry.registry.addonId === addonId) {
+                return entry.registry;
+            }
+        }
+
+        return undefined;
     }
 }

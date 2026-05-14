@@ -1,23 +1,45 @@
 import type { KairoRegistry } from "@kairo-js/router";
 
-export type AddonStateStatus = "active" | "inactive" | "unresolved";
+export type AddonState = "active" | "inactive" | "unresolved";
+
+export type AddonInactiveReason =
+    | "dependency_conflict"
+    | "dependency_unresolved"
+    | "dependency_inactive"
+    | "user_disabled"
+    | "activation_failed"
+    | "dependency_activation_failed"
+    | "activation_timeout";
+
+export type AddonUnresolvedReason =
+    | "missing_dependency"
+    | "missing_peer_dependency"
+    | "circular_dependency"
+    | "self_dependency";
 
 export interface AddonStateEntry {
     readonly registry: KairoRegistry;
-    readonly status: AddonStateStatus;
-    readonly reason?: string;
+
+    readonly state: AddonState;
+
+    readonly reason?: AddonInactiveReason | AddonUnresolvedReason;
 }
 
 export class ActivationState {
     private readonly entries = new Map<string, AddonStateEntry>();
 
-    set(registry: KairoRegistry, status: AddonStateStatus, reason?: string): void {
-        console.log(`Addon ${registry.addonId} is now ${status}${reason ? ` (${reason})` : ""}`);
+    set(
+        registry: KairoRegistry,
+        state: AddonState,
+        reason?: AddonInactiveReason | AddonUnresolvedReason,
+    ): void {
         this.entries.set(registry.kairoId, {
             registry,
-            status,
+            state,
             reason,
         });
+
+        console.log(`Addon ${registry.addonId} is now ${state}${reason ? ` (${reason})` : ""}`);
     }
 
     get(kairoId: string): AddonStateEntry | undefined {
@@ -25,7 +47,15 @@ export class ActivationState {
     }
 
     isActive(kairoId: string): boolean {
-        return this.entries.get(kairoId)?.status === "active";
+        return this.entries.get(kairoId)?.state === "active";
+    }
+
+    isInactive(kairoId: string): boolean {
+        return this.entries.get(kairoId)?.state === "inactive";
+    }
+
+    isUnresolved(kairoId: string): boolean {
+        return this.entries.get(kairoId)?.state === "unresolved";
     }
 
     getAll(): readonly AddonStateEntry[] {
@@ -33,14 +63,14 @@ export class ActivationState {
     }
 
     getActive(): readonly AddonStateEntry[] {
-        return this.getAll().filter((entry) => entry.status === "active");
+        return this.getAll().filter((x) => x.state === "active");
     }
 
     getInactive(): readonly AddonStateEntry[] {
-        return this.getAll().filter((entry) => entry.status === "inactive");
+        return this.getAll().filter((x) => x.state === "inactive");
     }
 
     getUnresolved(): readonly AddonStateEntry[] {
-        return this.getAll().filter((entry) => entry.status === "unresolved");
+        return this.getAll().filter((x) => x.state === "unresolved");
     }
 }
