@@ -1,31 +1,23 @@
 import type { KairoRegistry } from "@kairo-js/router";
-
 import type { KairoRegistryQueryable } from "../KairoRegistryIndex";
 
 export interface MissingDependency {
     readonly source: KairoRegistry;
-
-    readonly dependencyAddonId: string;
-
-    readonly requiredRange: string;
+    readonly addonId: string;
+    readonly range: string;
 }
 
 export interface MissingPeerDependency {
     readonly source: KairoRegistry;
-
-    readonly dependencyAddonId: string;
-
-    readonly requiredRange: string;
+    readonly addonId: string;
+    readonly range: string;
 }
 
 export interface DependencyConflict {
-    readonly source: KairoRegistry;
-
-    readonly dependencyAddonId: string;
-
+    readonly addonId: string; // conflict target
+    readonly requiredBy: KairoRegistry;
     readonly requiredRange: string;
-
-    readonly existingVersions: readonly KairoRegistry[];
+    readonly candidates: readonly KairoRegistry[];
 }
 
 export interface CircularDependency {
@@ -37,269 +29,145 @@ export interface SelfDependency {
 }
 
 export interface DependencyResolutionResult {
-    readonly validRegistries: readonly KairoRegistry[];
+    readonly registries: readonly KairoRegistry[];
 
     readonly missingDependencies: readonly MissingDependency[];
-
     readonly missingPeerDependencies: readonly MissingPeerDependency[];
-
     readonly dependencyConflicts: readonly DependencyConflict[];
-
     readonly circularDependencies: readonly CircularDependency[];
-
     readonly selfDependencies: readonly SelfDependency[];
 }
 
-interface ResolveContext {
-    readonly visiting: Set<string>;
+interface Context {
+    visiting: Set<string>;
+    stack: string[];
 
-    readonly valid: Set<string>;
+    resolved: Map<string, KairoRegistry>;
 
-    readonly invalid: Set<string>;
-
-    readonly stack: string[];
-
-    readonly missingDependencies: MissingDependency[];
-
-    readonly missingPeerDependencies: MissingPeerDependency[];
-
-    readonly dependencyConflicts: DependencyConflict[];
-
-    readonly circularDependencies: CircularDependency[];
-
-    readonly selfDependencies: SelfDependency[];
+    missing: MissingDependency[];
+    missingPeer: MissingPeerDependency[];
+    conflicts: DependencyConflict[];
+    cycles: CircularDependency[];
+    self: SelfDependency[];
 }
 
 export class AddonDependencyResolver {
-    constructor(private readonly registryIndex: KairoRegistryQueryable) {}
+    constructor(private readonly index: KairoRegistryQueryable) {}
 
     resolve(registries: readonly KairoRegistry[]): DependencyResolutionResult {
-        const context: ResolveContext = {
+        const ctx: Context = {
             visiting: new Set(),
-
-            valid: new Set(),
-
-            invalid: new Set(),
-
             stack: [],
-
-            missingDependencies: [],
-
-            missingPeerDependencies: [],
-
-            dependencyConflicts: [],
-
-            circularDependencies: [],
-
-            selfDependencies: [],
+            resolved: new Map(),
+            missing: [],
+            missingPeer: [],
+            conflicts: [],
+            cycles: [],
+            self: [],
         };
 
-        for (const registry of registries) {
-            this.visit(registry, context);
+        for (const r of registries) {
+            this.visit(r, ctx);
         }
 
         return {
-            validRegistries: registries.filter((r) =>
-                context.valid.has(this.registryIndex.createRegistryKey(r)),
-            ),
-
-            missingDependencies: context.missingDependencies,
-
-            missingPeerDependencies: context.missingPeerDependencies,
-
-            dependencyConflicts: context.dependencyConflicts,
-
-            circularDependencies: context.circularDependencies,
-
-            selfDependencies: context.selfDependencies,
+            registries: [...ctx.resolved.values()],
+            missingDependencies: ctx.missing,
+            missingPeerDependencies: ctx.missingPeer,
+            dependencyConflicts: ctx.conflicts,
+            circularDependencies: ctx.cycles,
+            selfDependencies: ctx.self,
         };
     }
 
-    private visit(
-        registry: KairoRegistry,
+    private visit(registry: KairoRegistry, ctx: Context): boolean {
+        const key = this.index.createRegistryKey(registry);
 
-        context: ResolveContext,
-    ): boolean {
-        const key = this.registryIndex.createRegistryKey(registry);
+        if (ctx.resolved.has(registry.addonId)) return true;
 
-        if (context.valid.has(key)) {
-            return true;
-        }
-
-        if (context.invalid.has(key)) {
+        if (ctx.visiting.has(key)) {
+            const i = ctx.stack.indexOf(key);
+            ctx.cycles.push({ path: [...ctx.stack.slice(i), key] });
             return false;
         }
 
-        if (context.visiting.has(key)) {
-            const start = context.stack.indexOf(key);
+        ctx.visiting.add(key);
+        ctx.stack.push(key);
 
-            const cycle = [...context.stack.slice(start), key];
+        let ok = true;
 
-            context.circularDependencies.push({
-                path: cycle,
-            });
+        ok &&= this.resolveDeps(registry, ctx);
+        ok &&= this.resolvePeers(registry, ctx);
 
-            for (const cycleKey of cycle) {
-                context.invalid.add(cycleKey);
-            }
+        ctx.stack.pop();
+        ctx.visiting.delete(key);
 
-            return false;
-        }
+        if (ok) ctx.resolved.set(registry.addonId, registry);
 
-        context.visiting.add(key);
-
-        context.stack.push(key);
-
-        let success = true;
-
-        success &&= this.resolveDependencies(registry, context);
-
-        success &&= this.validatePeerDependencies(registry, context);
-
-        context.stack.pop();
-
-        context.visiting.delete(key);
-
-        if (!success) {
-            context.invalid.add(key);
-
-            return false;
-        }
-
-        context.valid.add(key);
-
-        return true;
+        return ok;
     }
 
-    private resolveDependencies(
-        registry: KairoRegistry,
+    private resolveDeps(registry: KairoRegistry, ctx: Context): boolean {
+        let ok = true;
 
-        context: ResolveContext,
-    ): boolean {
-        let success = true;
+        ok &&= this.resolveMap(registry, registry.dependencies, true, ctx);
+        ok &&= this.resolveMap(registry, registry.optionalDependencies, false, ctx);
 
-        success &&= this.resolveMap(registry, registry.dependencies, true, context);
-
-        success &&= this.resolveMap(registry, registry.optionalDependencies, false, context);
-
-        return success;
+        return ok;
     }
 
     private resolveMap(
         registry: KairoRegistry,
-
-        dependencies: Readonly<Record<string, string>>,
-
+        deps: Record<string, string>,
         required: boolean,
-
-        context: ResolveContext,
+        ctx: Context,
     ): boolean {
-        let success = true;
+        let ok = true;
 
-        for (const [addonId, range] of Object.entries(dependencies)) {
+        for (const [addonId, range] of Object.entries(deps)) {
             if (addonId === registry.addonId) {
-                context.selfDependencies.push({
-                    registry,
-                });
-
-                context.invalid.add(this.registryIndex.createRegistryKey(registry));
-
-                success = false;
-
+                ctx.self.push({ registry });
+                ok = false;
                 continue;
             }
 
-            const versions = this.registryIndex.getAddonVersions(addonId);
+            const candidates = this.index.getAddonVersions(addonId);
+            const match = this.index.resolveVersion(addonId, range);
 
-            if (versions.length === 0) {
+            if (!match) {
                 if (required) {
-                    context.missingDependencies.push({
+                    ctx.missing.push({
                         source: registry,
-
-                        dependencyAddonId: addonId,
-
-                        requiredRange: range,
+                        addonId,
+                        range,
                     });
-
-                    context.invalid.add(this.registryIndex.createRegistryKey(registry));
-
-                    success = false;
+                    ok = false;
                 }
-
                 continue;
             }
 
-            const resolved = this.registryIndex.resolveVersion(addonId, range);
-
-            if (!resolved) {
-                context.dependencyConflicts.push({
-                    source: registry,
-
-                    dependencyAddonId: addonId,
-
-                    requiredRange: range,
-
-                    existingVersions: versions,
-                });
-
-                success = false;
-
-                continue;
-            }
-
-            const childSuccess = this.visit(resolved, context);
-
-            if (!childSuccess) {
-                success = false;
-            }
+            this.visit(match, ctx);
         }
 
-        return success;
+        return ok;
     }
 
-    private validatePeerDependencies(
-        registry: KairoRegistry,
-
-        context: ResolveContext,
-    ): boolean {
-        let success = true;
+    private resolvePeers(registry: KairoRegistry, ctx: Context): boolean {
+        let ok = true;
 
         for (const [addonId, range] of Object.entries(registry.peerDependencies)) {
-            const versions = this.registryIndex.getAddonVersions(addonId);
+            const match = this.index.resolveVersion(addonId, range);
 
-            if (versions.length === 0) {
-                context.missingPeerDependencies.push({
+            if (!match) {
+                ctx.missingPeer.push({
                     source: registry,
-
-                    dependencyAddonId: addonId,
-
-                    requiredRange: range,
+                    addonId,
+                    range,
                 });
-
-                context.invalid.add(this.registryIndex.createRegistryKey(registry));
-
-                success = false;
-
-                continue;
-            }
-
-            const resolved = this.registryIndex.resolveVersion(addonId, range);
-
-            if (!resolved) {
-                context.dependencyConflicts.push({
-                    source: registry,
-
-                    dependencyAddonId: addonId,
-
-                    requiredRange: range,
-
-                    existingVersions: versions,
-                });
-
-                success = false;
+                ok = false;
             }
         }
 
-        return success;
+        return ok;
     }
 }
