@@ -12,6 +12,7 @@ export class ActivationState {
     private readonly entries = new Map<string, AddonStateEntry>();
 
     set(registry: KairoRegistry, status: AddonStateStatus, reason?: string): void {
+        console.log(`Addon ${registry.addonId} is now ${status}${reason ? ` (${reason})` : ""}`);
         this.entries.set(registry.kairoId, {
             registry,
             status,

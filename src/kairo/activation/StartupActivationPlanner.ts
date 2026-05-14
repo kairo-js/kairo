@@ -1,24 +1,26 @@
 import type { KairoRegistry } from "@kairo-js/router";
-
 import type { KairoRegistryQueryable } from "../KairoRegistryIndex";
 import type {
     AddonDependencyResolver,
-    DependencyConflict,
+    CircularDependency,
     MissingDependency,
     MissingPeerDependency,
 } from "./AddonDependencyResolver";
 
 export interface InactiveAddon {
     readonly registry: KairoRegistry;
-    readonly reason: "dependency_conflict";
-    readonly conflicts: readonly DependencyConflict[];
+    readonly reason:
+        | "dependency_conflict"
+        | "missing_dependency"
+        | "missing_peer_dependency"
+        | "circular_dependency";
 }
 
 export interface UnresolvedAddon {
     readonly registry: KairoRegistry;
-    readonly reason: "missing_dependency" | "missing_peer_dependency";
     readonly missingDependencies: readonly MissingDependency[];
     readonly missingPeerDependencies: readonly MissingPeerDependency[];
+    readonly circularDependencies: readonly CircularDependency[];
 }
 
 export interface StartupActivationPlan {
@@ -35,176 +37,115 @@ export class StartupActivationPlanner {
 
     createPlan(): StartupActivationPlan {
         const registries = this.registryIndex.getAll();
+        const res = this.resolver.resolve(registries);
 
-        const resolution = this.resolver.resolve(registries);
-
-        const unresolved = this.createUnresolvedAddons(
-            registries,
-            resolution.missingDependencies,
-            resolution.missingPeerDependencies,
-        );
-
-        const inactive = this.createInactiveAddons(registries, resolution.conflicts);
+        const unresolved = this.buildUnresolved(registries, res);
+        const inactive = this.buildInactive(registries, res);
 
         const excluded = new Set<string>();
 
-        for (const addon of unresolved) {
-            excluded.add(this.registryIndex.createRegistryKey(addon.registry));
+        for (const u of unresolved) {
+            excluded.add(this.registryIndex.createRegistryKey(u.registry));
+        }
+        for (const i of inactive) {
+            excluded.add(this.registryIndex.createRegistryKey(i.registry));
         }
 
-        for (const addon of inactive) {
-            excluded.add(this.registryIndex.createRegistryKey(addon.registry));
-        }
-
-        const activationCandidates = resolution.registries.filter(
-            (registry) => !excluded.has(this.registryIndex.createRegistryKey(registry)),
+        const candidates = res.registries.filter(
+            (r) => !excluded.has(this.registryIndex.createRegistryKey(r)),
         );
 
-        const activationOrder = this.sortTopologically(activationCandidates);
-
         return {
-            activationOrder,
+            activationOrder: this.topoSort(candidates),
             inactive,
             unresolved,
         };
     }
 
-    private createInactiveAddons(
-        registries: readonly KairoRegistry[],
-        conflicts: readonly DependencyConflict[],
-    ): readonly InactiveAddon[] {
-        const map = new Map<string, DependencyConflict[]>();
-
-        for (const conflict of conflicts) {
-            const key = this.registryIndex.createRegistryKey(conflict.requestedBy);
-
-            const list = map.get(key) ?? [];
-
-            list.push(conflict);
-
-            map.set(key, list);
-        }
-
-        const result: InactiveAddon[] = [];
-
-        for (const registry of registries) {
-            const key = this.registryIndex.createRegistryKey(registry);
-
-            const addonConflicts = map.get(key);
-
-            if (!addonConflicts) {
-                continue;
-            }
-
-            result.push({
-                registry,
-                reason: "dependency_conflict",
-                conflicts: addonConflicts,
-            });
-        }
-
-        return result;
-    }
-
-    private createUnresolvedAddons(
-        registries: readonly KairoRegistry[],
-        missingDependencies: readonly MissingDependency[],
-        missingPeerDependencies: readonly MissingPeerDependency[],
-    ): readonly UnresolvedAddon[] {
-        const dependencyMap = new Map<string, MissingDependency[]>();
-
-        const peerMap = new Map<string, MissingPeerDependency[]>();
-
-        for (const missing of missingDependencies) {
-            const key = this.registryIndex.createRegistryKey(missing.source);
-
-            const list = dependencyMap.get(key) ?? [];
-
-            list.push(missing);
-
-            dependencyMap.set(key, list);
-        }
-
-        for (const missing of missingPeerDependencies) {
-            const key = this.registryIndex.createRegistryKey(missing.source);
-
-            const list = peerMap.get(key) ?? [];
-
-            list.push(missing);
-
-            peerMap.set(key, list);
-        }
-
+    private buildUnresolved(registries: readonly KairoRegistry[], res: any): UnresolvedAddon[] {
         const result: UnresolvedAddon[] = [];
 
-        for (const registry of registries) {
-            const key = this.registryIndex.createRegistryKey(registry);
+        for (const r of registries) {
+            const key = this.registryIndex.createRegistryKey(r);
 
-            const addonMissingDependencies = dependencyMap.get(key) ?? [];
+            const missingDep = res.missingDependencies.filter(
+                (x: any) => this.registryIndex.createRegistryKey(x.source) === key,
+            );
 
-            const addonMissingPeerDependencies = peerMap.get(key) ?? [];
+            const missingPeer = res.missingPeerDependencies.filter(
+                (x: any) => this.registryIndex.createRegistryKey(x.source) === key,
+            );
 
-            if (
-                addonMissingDependencies.length === 0 &&
-                addonMissingPeerDependencies.length === 0
-            ) {
-                continue;
+            const circular = res.circularDependencies.filter((c: any) =>
+                c.path.includes(r.addonId),
+            );
+
+            if (missingDep.length || missingPeer.length || circular.length) {
+                result.push({
+                    registry: r,
+                    missingDependencies: missingDep,
+                    missingPeerDependencies: missingPeer,
+                    circularDependencies: circular,
+                });
             }
-
-            result.push({
-                registry,
-                reason:
-                    addonMissingDependencies.length > 0
-                        ? "missing_dependency"
-                        : "missing_peer_dependency",
-                missingDependencies: addonMissingDependencies,
-                missingPeerDependencies: addonMissingPeerDependencies,
-            });
         }
 
         return result;
     }
 
-    private sortTopologically(registries: readonly KairoRegistry[]): readonly KairoRegistry[] {
+    private buildInactive(registries: readonly KairoRegistry[], res: any): InactiveAddon[] {
+        const result: InactiveAddon[] = [];
+
+        for (const r of registries) {
+            const key = this.registryIndex.createRegistryKey(r);
+
+            const conflicts = res.conflicts.filter(
+                (c: any) => this.registryIndex.createRegistryKey(c.requestedBy) === key,
+            );
+
+            const circular = res.circularDependencies.some((c: any) => c.path.includes(r.addonId));
+
+            if (conflicts.length) {
+                result.push({
+                    registry: r,
+                    reason: "dependency_conflict",
+                });
+                continue;
+            }
+
+            if (circular) {
+                result.push({
+                    registry: r,
+                    reason: "circular_dependency",
+                });
+            }
+        }
+
+        return result;
+    }
+
+    private topoSort(registries: readonly KairoRegistry[]): readonly KairoRegistry[] {
         const result: KairoRegistry[] = [];
-
         const visited = new Set<string>();
+        const set = new Set(registries.map((r) => this.registryIndex.createRegistryKey(r)));
 
-        const registrySet = new Set(
-            registries.map((registry) => this.registryIndex.createRegistryKey(registry)),
-        );
+        const visit = (r: KairoRegistry) => {
+            const key = this.registryIndex.createRegistryKey(r);
+            if (visited.has(key)) return;
 
-        for (const registry of registries) {
-            this.visit(registry, registrySet, visited, result);
-        }
+            visited.add(key);
 
-        return result;
-    }
-
-    private visit(
-        registry: KairoRegistry,
-        registrySet: ReadonlySet<string>,
-        visited: Set<string>,
-        result: KairoRegistry[],
-    ): void {
-        const key = this.registryIndex.createRegistryKey(registry);
-
-        if (visited.has(key)) {
-            return;
-        }
-
-        visited.add(key);
-
-        for (const dependency of this.registryIndex.getDependencies(registry)) {
-            const dependencyKey = this.registryIndex.createRegistryKey(dependency);
-
-            if (!registrySet.has(dependencyKey)) {
-                continue;
+            for (const d of this.registryIndex.getDependencies(r)) {
+                const dk = this.registryIndex.createRegistryKey(d);
+                if (!set.has(dk)) continue;
+                visit(d);
             }
 
-            this.visit(dependency, registrySet, visited, result);
-        }
+            result.push(r);
+        };
 
-        result.push(registry);
+        for (const r of registries) visit(r);
+
+        return result;
     }
 }

@@ -21,19 +21,27 @@ export interface DependencyConflict {
     readonly requestedRange: string;
 }
 
+export interface CircularDependency {
+    readonly path: readonly string[];
+}
+
 export interface DependencyResolutionResult {
     readonly registries: readonly KairoRegistry[];
     readonly missingDependencies: readonly MissingDependency[];
     readonly missingPeerDependencies: readonly MissingPeerDependency[];
     readonly conflicts: readonly DependencyConflict[];
+    readonly circularDependencies: readonly CircularDependency[];
 }
 
 interface ResolveContext {
     readonly resolved: Map<string, KairoRegistry>;
     readonly visiting: Set<string>;
+    readonly stack: string[];
+
     readonly missingDependencies: MissingDependency[];
     readonly missingPeerDependencies: MissingPeerDependency[];
     readonly conflicts: DependencyConflict[];
+    readonly circularDependencies: CircularDependency[];
 }
 
 export class AddonDependencyResolver {
@@ -41,11 +49,13 @@ export class AddonDependencyResolver {
 
     resolve(registries: readonly KairoRegistry[]): DependencyResolutionResult {
         const context: ResolveContext = {
-            resolved: new Map<string, KairoRegistry>(),
-            visiting: new Set<string>(),
+            resolved: new Map(),
+            visiting: new Set(),
+            stack: [],
             missingDependencies: [],
             missingPeerDependencies: [],
             conflicts: [],
+            circularDependencies: [],
         };
 
         for (const registry of registries) {
@@ -57,13 +67,21 @@ export class AddonDependencyResolver {
             missingDependencies: context.missingDependencies,
             missingPeerDependencies: context.missingPeerDependencies,
             conflicts: context.conflicts,
+            circularDependencies: context.circularDependencies,
         };
     }
 
     private visit(registry: KairoRegistry, context: ResolveContext): void {
-        const registryKey = this.registryIndex.createRegistryKey(registry);
+        const key = this.registryIndex.createRegistryKey(registry);
 
-        if (context.visiting.has(registryKey)) {
+        // cycle detect
+        if (context.visiting.has(key)) {
+            const start = context.stack.indexOf(key);
+
+            context.circularDependencies.push({
+                path: [...context.stack.slice(start), key],
+            });
+
             return;
         }
 
@@ -71,91 +89,96 @@ export class AddonDependencyResolver {
 
         if (locked) {
             this.validateConflict(locked, registry, SemVerUtils.format(registry.version), context);
-
             return;
         }
 
-        context.visiting.add(registryKey);
+        context.visiting.add(key);
+        context.stack.push(key);
+
         this.resolveDependencies(registry, context);
+
+        context.stack.pop();
+        context.visiting.delete(key);
+
         context.resolved.set(registry.addonId, registry);
+
         this.validatePeerDependencies(registry, context);
-        context.visiting.delete(registryKey);
     }
 
     private resolveDependencies(registry: KairoRegistry, context: ResolveContext): void {
-        this.resolveDependencyMap(registry, registry.dependencies, true, context);
-
-        this.resolveDependencyMap(registry, registry.optionalDependencies, false, context);
+        this.resolveMap(registry, registry.dependencies, true, context);
+        this.resolveMap(registry, registry.optionalDependencies, false, context);
     }
 
-    private resolveDependencyMap(
+    private resolveMap(
         registry: KairoRegistry,
-        dependencies: Readonly<Record<string, string>>,
+        deps: Readonly<Record<string, string>>,
         required: boolean,
         context: ResolveContext,
     ): void {
-        for (const [dependencyAddonId, requiredRange] of Object.entries(dependencies)) {
-            const locked = context.resolved.get(dependencyAddonId);
-
-            if (locked) {
-                this.validateConflict(locked, registry, requiredRange, context);
-
+        for (const [id, range] of Object.entries(deps)) {
+            // self dependency = error
+            if (id === registry.addonId) {
+                context.circularDependencies.push({
+                    path: [id, id],
+                });
                 continue;
             }
 
-            const dependency = this.registryIndex.resolveVersion(dependencyAddonId, requiredRange);
+            const locked = context.resolved.get(id);
 
-            if (!dependency) {
+            if (locked) {
+                this.validateConflict(locked, registry, range, context);
+                continue;
+            }
+
+            const resolved = this.registryIndex.resolveVersion(id, range);
+
+            if (!resolved) {
                 if (required) {
                     context.missingDependencies.push({
                         source: registry,
-                        dependencyAddonId,
-                        requiredRange,
+                        dependencyAddonId: id,
+                        requiredRange: range,
                     });
                 }
-
                 continue;
             }
 
-            this.visit(dependency, context);
+            this.visit(resolved, context);
         }
     }
 
     private validatePeerDependencies(registry: KairoRegistry, context: ResolveContext): void {
-        for (const [dependencyAddonId, requiredRange] of Object.entries(
-            registry.peerDependencies,
-        )) {
-            const locked = context.resolved.get(dependencyAddonId);
+        for (const [id, range] of Object.entries(registry.peerDependencies)) {
+            const locked = context.resolved.get(id);
 
             if (!locked) {
                 context.missingPeerDependencies.push({
                     source: registry,
-                    dependencyAddonId,
-                    requiredRange,
+                    dependencyAddonId: id,
+                    requiredRange: range,
                 });
-
                 continue;
             }
 
-            this.validateConflict(locked, registry, requiredRange, context);
+            this.validateConflict(locked, registry, range, context);
         }
     }
 
     private validateConflict(
         existing: KairoRegistry,
         requestedBy: KairoRegistry,
-        requiredRange: string,
+        range: string,
         context: ResolveContext,
     ): void {
-        if (SemVerUtils.satisfies(existing.version, requiredRange)) {
-            return;
-        }
+        if (SemVerUtils.satisfies(existing.version, range)) return;
 
         context.conflicts.push({
             addonId: existing.addonId,
             existing,
             requestedBy,
-            requestedRange: requiredRange,
+            requestedRange: range,
         });
     }
 }

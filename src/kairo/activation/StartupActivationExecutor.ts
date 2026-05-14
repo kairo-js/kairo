@@ -1,5 +1,4 @@
 import type { KairoRegistry } from "@kairo-js/router";
-import { SemVerUtils } from "@kairo-js/utils";
 import type { ActivationState } from "./ActivationState";
 import type { StartupActivationPlan } from "./StartupActivationPlanner";
 import type { ActivationResult } from "./result/schema";
@@ -15,57 +14,39 @@ export class StartupActivationExecutor {
     ) {}
 
     async execute(plan: StartupActivationPlan): Promise<void> {
-        for (const unresolved of plan.unresolved) {
-            this.activationState.set(unresolved.registry, "unresolved", unresolved.reason);
+        for (const u of plan.unresolved) {
+            this.activationState.set(u.registry, "unresolved", "dependency_issue");
         }
 
-        for (const inactive of plan.inactive) {
-            this.activationState.set(inactive.registry, "inactive", inactive.reason);
+        for (const i of plan.inactive) {
+            this.activationState.set(i.registry, "inactive", i.reason);
         }
 
-        const failedAddonIds = new Set<string>();
+        const failed = new Set<string>();
 
-        for (const registry of plan.activationOrder) {
-            if (this.hasFailedDependency(registry, failedAddonIds)) {
-                this.activationState.set(registry, "inactive", "dependency_activation_failed");
-
-                failedAddonIds.add(registry.addonId);
-
+        for (const r of plan.activationOrder) {
+            if (this.hasFailedDependency(r, failed)) {
+                this.activationState.set(r, "inactive", "dependency_activation_failed");
+                failed.add(r.addonId);
                 continue;
             }
 
-            const result = await this.requester.requestActivation(registry.kairoId);
+            const res = await this.requester.requestActivation(r.kairoId);
 
-            if (result.status === "success") {
-                this.activationState.set(registry, "active");
-
-                console.log(
-                    `Activated addon: ${registry.addonId}@${SemVerUtils.format(registry.version)}`,
-                );
-
+            if (res.status === "success") {
+                this.activationState.set(r, "active");
                 continue;
             }
 
-            this.activationState.set(registry, "inactive", result.reason ?? "activation_failed");
-
-            console.log(
-                `§cFailed to activate addon: ${registry.addonId}@${SemVerUtils.format(registry.version)} - Status: ${result.status}§r`,
-            );
-
-            failedAddonIds.add(registry.addonId);
+            this.activationState.set(r, "inactive", res.reason ?? "activation_failed");
+            failed.add(r.addonId);
         }
     }
 
-    private hasFailedDependency(
-        registry: KairoRegistry,
-        failedAddonIds: ReadonlySet<string>,
-    ): boolean {
-        for (const dependencyAddonId of Object.keys(registry.dependencies)) {
-            if (failedAddonIds.has(dependencyAddonId)) {
-                return true;
-            }
+    private hasFailedDependency(registry: KairoRegistry, failed: ReadonlySet<string>): boolean {
+        for (const id of Object.keys(registry.dependencies)) {
+            if (failed.has(id)) return true;
         }
-
         return false;
     }
 }

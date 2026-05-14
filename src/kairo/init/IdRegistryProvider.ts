@@ -12,6 +12,7 @@ export class IdRegistryProvider {
 
     constructor(private readonly random: Random) {}
 
+    // Scoreboard Object を作って返す
     provideRegistry(runtime: KairoRuntime): string {
         const prefix = "krid-";
 
