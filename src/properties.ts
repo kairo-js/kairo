@@ -18,7 +18,7 @@ export const properties: AddonProperties = {
         },
         min_engine_version: { major: 1, minor: 21, patch: 132 },
     },
-    dependencies: [
+    minecraftDependencies: [
         {
             module_name: "@minecraft/server",
             version: "2.5.0",
@@ -28,8 +28,10 @@ export const properties: AddonProperties = {
             version: "2.0.0",
         },
     ],
-    /** 前提アドオン */
-    requiredAddons: {
+    /** 依存アドオン */
+    peerDependencies: {},
+    optionalDependencies: {},
+    dependencies: {
         /**
          * id: version (string) // "kairo": "1.0.0"
          */

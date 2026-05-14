@@ -98,7 +98,6 @@ export class KairoInitializer implements Disposable {
             }
 
             this.phase = InitPhase.Completed;
-            this.releaseInitResources();
 
             // Initialization is complete; activation can begin from the onCompleted callback.
             this.dispose();

@@ -32,6 +32,14 @@ export class KairoRuntime {
         };
     }
 
+    runTimeout(callback: () => void, ticks: number): Disposable {
+        const timeoutId = system.runTimeout(callback, ticks);
+
+        return {
+            dispose: () => system.clearRun(timeoutId),
+        };
+    }
+
     getRegistry(id: string): {
         id: string;
         displayName: string;

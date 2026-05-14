@@ -210,7 +210,7 @@ export async function writeManifests(rootDir) {
     const kairoVersion = resolveInstalledKairoVersion(rootDir);
     const common = buildCommon(properties.header, properties.metadata, finalVersion, kairoVersion);
 
-    const bpManifest = buildBP(common, uuids, finalVersion, properties.dependencies);
+    const bpManifest = buildBP(common, uuids, finalVersion, properties.minecraftDependencies);
     const rpManifest = buildRP(common, uuids, finalVersion);
 
     fs.mkdirSync(path.join(rootDir, "BP"), { recursive: true });
