@@ -1,151 +1,85 @@
-import type { KairoRegistry } from "@kairo-js/router";
 import type { KairoRegistryQueryable } from "../KairoRegistryIndex";
-import type { AddonDependencyResolver } from "./AddonDependencyResolver";
+import { ActivationCandidateStore, type ActivationPlan } from "./ActivationCandidateStore";
+import { ActivationConflictPlanner } from "./ActivationConflictPlanner";
+import { ActivationPlanBuilder } from "./ActivationPlanBuilder";
+import { ActivationPlanningGraph } from "./ActivationPlanningGraph";
+import { ActivationStateInitializer } from "./ActivationStateInitializer";
+import { DependencyCycleResolver, type DependencyCycle } from "./DependencyCycleResolver";
+import { DependencyGraphBuilder } from "./DependencyGraphBuilder";
+import { DependencyInactivePropagator } from "./DependencyInactivePropagator";
+import { DependencyRequirementResolver } from "./DependencyRequirementResolver";
+import { VersionEvaluator } from "./VersionEvaluator";
+import { VersionParser } from "./VersionParser";
 
-export interface InactiveAddon {
-    readonly registry: KairoRegistry;
-    readonly reason: "dependency_conflict" | "dependency_inactive";
-}
-
-export interface UnresolvedAddon {
-    readonly registry: KairoRegistry;
-    readonly reason:
-        | "missing_dependency"
-        | "missing_peer_dependency"
-        | "circular_dependency"
-        | "self_dependency";
-}
-
-export interface StartupActivationPlan {
-    readonly activationOrder: readonly KairoRegistry[];
-    readonly inactive: readonly InactiveAddon[];
-    readonly unresolved: readonly UnresolvedAddon[];
+export interface StartupActivationPlannerOptions {
+    readonly includePrerelease?: boolean;
 }
 
 export class StartupActivationPlanner {
-    constructor(
-        private readonly index: KairoRegistryQueryable,
-        private readonly resolver: AddonDependencyResolver,
-    ) {}
+    private readonly versionParser = new VersionParser();
 
-    createPlan(): StartupActivationPlan {
-        const all = this.index.getAll();
-        const res = this.resolver.resolve(all);
+    private readonly versionEvaluator = new VersionEvaluator();
 
-        const inactive = new Set<string>();
-        const unresolved = new Set<string>();
+    private readonly dependencyGraphBuilder: DependencyGraphBuilder;
 
-        const inactiveList: InactiveAddon[] = [];
-        const unresolvedList: UnresolvedAddon[] = [];
+    private readonly dependencyRequirementResolver: DependencyRequirementResolver;
 
-        // 1. unresolved（addon単位）
-        for (const r of all) {
-            if (res.selfDependencies.some((x) => x.registry.addonId === r.addonId)) {
-                unresolved.add(this.index.createRegistryKey(r));
-                unresolvedList.push({ registry: r, reason: "self_dependency" });
-            }
+    private readonly dependencyCycleResolver = new DependencyCycleResolver();
 
-            if (
-                res.circularDependencies.some((c) =>
-                    c.path.includes(this.index.createRegistryKey(r)),
-                )
-            ) {
-                unresolved.add(this.index.createRegistryKey(r));
-                unresolvedList.push({ registry: r, reason: "circular_dependency" });
-            }
+    private readonly activationStateInitializer = new ActivationStateInitializer();
 
-            if (res.missingDependencies.some((x) => x.source.addonId === r.addonId)) {
-                unresolved.add(this.index.createRegistryKey(r));
-                unresolvedList.push({ registry: r, reason: "missing_dependency" });
-            }
+    private readonly activationConflictPlanner = new ActivationConflictPlanner();
 
-            if (res.missingPeerDependencies.some((x) => x.source.addonId === r.addonId)) {
-                unresolved.add(this.index.createRegistryKey(r));
-                unresolvedList.push({ registry: r, reason: "missing_peer_dependency" });
-            }
-        }
+    private readonly dependencyInactivePropagator = new DependencyInactivePropagator();
 
-        // 2. conflict（★addonId単位で全version潰す）
-        for (const c of res.dependencyConflicts) {
-            const versions = this.index.getAddonVersions(c.addonId);
+    private readonly activationPlanBuilder = new ActivationPlanBuilder();
 
-            for (const v of versions) {
-                const key = this.index.createRegistryKey(v);
+    constructor(private readonly registryIndex: KairoRegistryQueryable) {
+        this.dependencyGraphBuilder = new DependencyGraphBuilder(registryIndex, this.versionParser);
 
-                inactive.add(key);
-                inactiveList.push({
-                    registry: v,
-                    reason: "dependency_conflict",
-                });
-            }
-        }
-
-        // 3. propagation
-        let changed = true;
-
-        while (changed) {
-            changed = false;
-
-            for (const r of all) {
-                const key = this.index.createRegistryKey(r);
-
-                if (inactive.has(key) || unresolved.has(key)) continue;
-
-                for (const dep of Object.keys(r.dependencies)) {
-                    const depRegs = this.index.getAddonVersions(dep);
-
-                    const blocked = depRegs.some(
-                        (d) =>
-                            inactive.has(this.index.createRegistryKey(d)) ||
-                            unresolved.has(this.index.createRegistryKey(d)),
-                    );
-
-                    if (blocked) {
-                        inactive.add(key);
-                        inactiveList.push({
-                            registry: r,
-                            reason: "dependency_inactive",
-                        });
-                        changed = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        const excluded = new Set([...inactive, ...unresolved]);
-
-        const candidates = all.filter((r) => !excluded.has(this.index.createRegistryKey(r)));
-
-        return {
-            activationOrder: this.topo(candidates),
-            inactive: inactiveList,
-            unresolved: unresolvedList,
-        };
+        this.dependencyRequirementResolver = new DependencyRequirementResolver(
+            registryIndex,
+            this.versionEvaluator,
+        );
     }
 
-    private topo(registries: readonly KairoRegistry[]) {
-        const res: KairoRegistry[] = [];
-        const visited = new Set<string>();
-        const set = new Set(registries.map((r) => this.index.createRegistryKey(r)));
+    createPlan(options?: StartupActivationPlannerOptions): ActivationPlan {
+        const dependencyGraph = this.dependencyGraphBuilder.build();
 
-        const visit = (r: KairoRegistry) => {
-            const key = this.index.createRegistryKey(r);
-            if (visited.has(key)) return;
+        const resolutionGraph = this.dependencyRequirementResolver.resolve(dependencyGraph, {
+            includePrerelease: options?.includePrerelease,
+        });
 
-            visited.add(key);
+        const cycles = this.dependencyCycleResolver.resolve(resolutionGraph);
 
-            for (const d of this.index.getDependencies(r)) {
-                const dk = this.index.createRegistryKey(d);
-                if (!set.has(dk)) continue;
-                visit(d);
+        const planningGraph = new ActivationPlanningGraph(resolutionGraph);
+
+        this.applyCycles(planningGraph, cycles.hardCycles);
+
+        this.activationStateInitializer.initialize(planningGraph);
+
+        const candidates = new ActivationCandidateStore();
+
+        this.activationConflictPlanner.apply(planningGraph, candidates);
+
+        this.dependencyInactivePropagator.propagate(planningGraph);
+
+        return this.activationPlanBuilder.build(planningGraph);
+    }
+
+    private applyCycles(graph: ActivationPlanningGraph, cycles: readonly DependencyCycle[]): void {
+        for (const cycle of cycles) {
+            for (const edge of cycle.edges) {
+                const node = graph.get(edge.from.kairoId);
+
+                if (!node) {
+                    continue;
+                }
+
+                node.state = "unresolved";
+
+                node.reason = "circular_dependency";
             }
-
-            res.push(r);
-        };
-
-        for (const r of registries) visit(r);
-
-        return res;
+        }
     }
 }

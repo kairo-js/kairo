@@ -19,9 +19,7 @@ export type AddonUnresolvedReason =
 
 export interface AddonStateEntry {
     readonly registry: KairoRegistry;
-
     readonly state: AddonState;
-
     readonly reason?: AddonInactiveReason | AddonUnresolvedReason;
 }
 
@@ -33,12 +31,7 @@ export class ActivationState {
         state: AddonState,
         reason?: AddonInactiveReason | AddonUnresolvedReason,
     ): void {
-        this.entries.set(registry.kairoId, {
-            registry,
-            state,
-            reason,
-        });
-
+        this.entries.set(registry.kairoId, { registry, state, reason });
         console.log(`Addon ${registry.addonId} is now ${state}${reason ? ` (${reason})` : ""}`);
     }
 

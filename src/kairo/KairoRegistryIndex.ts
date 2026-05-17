@@ -21,13 +21,10 @@ export class KairoRegistryIndex implements KairoRegistryQueryable {
 
     add(registry: KairoRegistry): void {
         const key = this.createRegistryKey(registry);
-
         if (this.byAddonVersion.has(key)) {
             throw new Error(`Registry already exists: ${key}`);
         }
-
         this.byAddonVersion.set(key, registry);
-
         this.indexAddonVersion(registry);
         this.indexDependents(registry);
     }
@@ -50,55 +47,33 @@ export class KairoRegistryIndex implements KairoRegistryQueryable {
 
     resolveVersion(addonId: string, range: string): KairoRegistry | undefined {
         const registries = this.byAddonId.get(addonId);
-
-        if (!registries) {
-            return undefined;
-        }
-
+        if (!registries) return undefined;
         for (const registry of registries) {
             if (SemVerUtils.satisfies(registry.version, range)) {
                 return registry;
             }
         }
-
         return undefined;
     }
 
     getDependents(addonId: string): readonly KairoRegistry[] {
         const addonIds = this.dependents.get(addonId);
-
-        if (!addonIds) {
-            return [];
-        }
-
+        if (!addonIds) return [];
         const result: KairoRegistry[] = [];
-
         for (const dependentAddonId of addonIds) {
             const registries = this.byAddonId.get(dependentAddonId);
-
-            if (!registries) {
-                continue;
-            }
-
+            if (!registries) continue;
             result.push(...registries);
         }
-
         return result;
     }
 
     getDependencies(registry: KairoRegistry): readonly KairoRegistry[] {
         const result: KairoRegistry[] = [];
-
         for (const [addonId, range] of Object.entries(registry.dependencies)) {
             const resolved = this.resolveVersion(addonId, range);
-
-            if (!resolved) {
-                continue;
-            }
-
-            result.push(resolved);
+            if (resolved) result.push(resolved);
         }
-
         return result;
     }
 
@@ -112,24 +87,18 @@ export class KairoRegistryIndex implements KairoRegistryQueryable {
 
     private indexAddonVersion(registry: KairoRegistry): void {
         const registries = this.byAddonId.get(registry.addonId) ?? [];
-
         registries.push(registry);
-
         registries.sort((a, b) => SemVerUtils.rcompare(a.version, b.version));
-
         this.byAddonId.set(registry.addonId, registries);
     }
 
     private indexDependents(registry: KairoRegistry): void {
         for (const dependencyAddonId of Object.keys(registry.dependencies)) {
             let set = this.dependents.get(dependencyAddonId);
-
             if (!set) {
                 set = new Set<string>();
-
                 this.dependents.set(dependencyAddonId, set);
             }
-
             set.add(registry.addonId);
         }
     }
