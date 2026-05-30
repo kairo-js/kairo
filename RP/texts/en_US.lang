@@ -41,3 +41,28 @@ kairo.error.not.found.message=An unexpected issue has occurred.
 kairo.error.not.found.hint=Please contact the Kairo developer.
 kairo.error.resolve.for.activation.message=An unexpected issue occurred while activating a required addon.
 kairo.error.resolve.for.activation.hint=Please check that all required addons are installed correctly.
+
+## Addon management UI
+kairo.form.addonList.title=Addon Manager
+kairo.form.addonList.body=Select an addon to view details.
+
+kairo.form.addon.active=Active
+kairo.form.addon.inactive=Inactive
+kairo.form.addon.unresolved=Unresolved
+
+kairo.form.detail.version.label=Version
+kairo.form.detail.disable=Disable
+kairo.form.detail.latest=Latest Version
+kairo.form.detail.submit=Apply
+kairo.form.detail.deps.none=No dependencies
+
+kairo.form.unresolved.title=Unresolved Addon
+kairo.form.unresolved.close=Close
+kairo.form.unresolved.reasons=Reasons
+
+kairo.form.confirm.title=Confirm
+kairo.form.confirm.yes=Yes
+kairo.form.confirm.no=No
+kairo.form.confirm.disable.cascade=Disabling this addon will also disable the following addons:
+kairo.form.confirm.enable.deps=The following addons are required and will also be enabled:
+kairo.form.confirm.version.switch.cascade=Switching to this version will disable the following incompatible addons:

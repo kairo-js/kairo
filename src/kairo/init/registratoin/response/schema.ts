@@ -25,7 +25,6 @@ export const RegistrationResponseSchema = Type.Object(
             ),
             dependencies: Type.Readonly(Type.Record(Type.String(), Type.String())),
             optionalDependencies: Type.Readonly(Type.Record(Type.String(), Type.String())),
-            peerDependencies: Type.Readonly(Type.Record(Type.String(), Type.String())),
             tags: Type.Readonly(Type.Array(Type.String())),
         }),
         timestamp: Type.Integer({ minimum: 0 }),

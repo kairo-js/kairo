@@ -1,6 +1,6 @@
 import { toError } from "@kairo-js/utils";
-import type { KairoRuntime } from "../../minecraft/KairoRuntime";
-import { ActivationEventId } from "./constants/ActivationEventId";
+import type { KairoRuntime } from "../../../minecraft/KairoRuntime";
+import { ActivationEventId } from "../constants/ActivationEventId";
 import { ActivationRequestSenderError, ActivationRequestSenderErrorReason } from "./request/errors";
 import type { ActivationRequest } from "./request/schema";
 import { stringifyActivationRequest } from "./request/stringify";

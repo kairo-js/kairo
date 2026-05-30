@@ -1,5 +1,5 @@
-import { BaseListener } from "../BaseListener";
-import { ActivationEventId } from "./constants/ActivationEventId";
+import { BaseListener } from "../../BaseListener";
+import { ActivationEventId } from "../constants/ActivationEventId";
 
 type Handler = (message: string) => void;
 const ACTIVATION_EVENT_ID_SET = new Set<ActivationEventId>(Object.values(ActivationEventId));

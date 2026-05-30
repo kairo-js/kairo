@@ -7,37 +7,34 @@ export interface KairoRegistryQueryable {
     getAddonVersion(addonId: string, version: SemVer): KairoRegistry | undefined;
     getAddonVersions(addonId: string): readonly KairoRegistry[];
     getLatestAddonVersion(addonId: string): KairoRegistry | undefined;
-    resolveVersion(addonId: string, range: string): KairoRegistry | undefined;
     getDependents(addonId: string): readonly KairoRegistry[];
-    getDependencies(registry: KairoRegistry): readonly KairoRegistry[];
     getAll(): readonly KairoRegistry[];
     createRegistryKey(registry: KairoRegistry): string;
 }
 
 export class KairoRegistryIndex implements KairoRegistryQueryable {
-    private readonly byAddonVersion = new Map<string, KairoRegistry>();
+    private readonly byKey = new Map<string, KairoRegistry>();
     private readonly byAddonId = new Map<string, KairoRegistry[]>();
     private readonly dependents = new Map<string, Set<string>>();
 
     add(registry: KairoRegistry): void {
         const key = this.createRegistryKey(registry);
 
-        if (this.byAddonVersion.has(key)) {
+        if (this.byKey.has(key)) {
             throw new Error(`Registry already exists: ${key}`);
         }
 
-        this.byAddonVersion.set(key, registry);
-
-        this.indexAddonVersion(registry);
+        this.byKey.set(key, registry);
+        this.indexByAddonId(registry);
         this.indexDependents(registry);
     }
 
     hasAddonVersion(addonId: string, version: SemVer): boolean {
-        return this.byAddonVersion.has(this.createKey(addonId, version));
+        return this.byKey.has(this.createKey(addonId, version));
     }
 
     getAddonVersion(addonId: string, version: SemVer): KairoRegistry | undefined {
-        return this.byAddonVersion.get(this.createKey(addonId, version));
+        return this.byKey.get(this.createKey(addonId, version));
     }
 
     getAddonVersions(addonId: string): readonly KairoRegistry[] {
@@ -48,86 +45,45 @@ export class KairoRegistryIndex implements KairoRegistryQueryable {
         return this.byAddonId.get(addonId)?.[0];
     }
 
-    resolveVersion(addonId: string, range: string): KairoRegistry | undefined {
-        const registries = this.byAddonId.get(addonId);
-
-        if (!registries) {
-            return undefined;
-        }
-
-        for (const registry of registries) {
-            if (SemVerUtils.satisfies(registry.version, range)) {
-                return registry;
-            }
-        }
-
-        return undefined;
-    }
-
     getDependents(addonId: string): readonly KairoRegistry[] {
-        const addonIds = this.dependents.get(addonId);
-
-        if (!addonIds) {
-            return [];
-        }
+        const set = this.dependents.get(addonId);
+        if (!set) return [];
 
         const result: KairoRegistry[] = [];
 
-        for (const dependentAddonId of addonIds) {
-            const registries = this.byAddonId.get(dependentAddonId);
-
-            if (!registries) {
-                continue;
-            }
-
-            result.push(...registries);
-        }
-
-        return result;
-    }
-
-    getDependencies(registry: KairoRegistry): readonly KairoRegistry[] {
-        const result: KairoRegistry[] = [];
-
-        for (const [addonId, range] of Object.entries(registry.dependencies)) {
-            const resolved = this.resolveVersion(addonId, range);
-
-            if (!resolved) {
-                continue;
-            }
-
-            result.push(resolved);
+        for (const dependentId of set) {
+            const list = this.byAddonId.get(dependentId);
+            if (!list) continue;
+            result.push(...list);
         }
 
         return result;
     }
 
     getAll(): readonly KairoRegistry[] {
-        return [...this.byAddonVersion.values()];
+        return [...this.byKey.values()];
     }
 
     createRegistryKey(registry: KairoRegistry): string {
         return this.createKey(registry.addonId, registry.version);
     }
 
-    private indexAddonVersion(registry: KairoRegistry): void {
-        const registries = this.byAddonId.get(registry.addonId) ?? [];
+    private indexByAddonId(registry: KairoRegistry): void {
+        const list = this.byAddonId.get(registry.addonId) ?? [];
+        list.push(registry);
 
-        registries.push(registry);
+        list.sort((a, b) => SemVerUtils.rcompare(a.version, b.version));
 
-        registries.sort((a, b) => SemVerUtils.rcompare(a.version, b.version));
-
-        this.byAddonId.set(registry.addonId, registries);
+        this.byAddonId.set(registry.addonId, list);
     }
 
     private indexDependents(registry: KairoRegistry): void {
-        for (const dependencyAddonId of Object.keys(registry.dependencies)) {
-            let set = this.dependents.get(dependencyAddonId);
+        for (const depAddonId of Object.keys(registry.dependencies)) {
+            let set = this.dependents.get(depAddonId);
 
             if (!set) {
                 set = new Set<string>();
-
-                this.dependents.set(dependencyAddonId, set);
+                this.dependents.set(depAddonId, set);
             }
 
             set.add(registry.addonId);
