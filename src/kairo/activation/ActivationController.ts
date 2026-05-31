@@ -68,7 +68,13 @@ export class ActivationController {
         this._world = this.buildWorldState();
         this._world.cachedDeclaredReverseGraph = this.buildReverseGraph(this._world);
         console.log(`[Kairo] Resolution Phase: ${this._world.runtimes.size} addon(s) registered`);
-        const scope = new Set<KairoId>(this._world.runtimes.keys());
+        const scope = new Set<KairoId>();
+        for (const kairoId of this._world.runtimes.keys()) {
+            const registry = this._world.registries.get(kairoId);
+            if (!registry) continue;
+            if (this._world.previousSession.get(registry.addonId)?.disabled) continue;
+            scope.add(kairoId);
+        }
         const plan = this.resolutionService.resolve(this._world, scope);
         this._activationOrder = plan.orderedKairoIds;
         console.log(`[Kairo] Resolution Phase complete: ${plan.orderedKairoIds.length} addon(s) scheduled for activation`);
@@ -186,15 +192,20 @@ export class ActivationController {
                 message: "Manually deactivated",
             });
             console.log(`[Kairo UI] Disabled: ${label}`);
+            const registry = world.registries.get(kairoId);
+            if (registry) {
+                world.previousSession.set(registry.addonId, {
+                    version: registry.version,
+                    origin: "explicit",
+                    disabled: true,
+                });
+            }
         }
     }
 
     async executeEnable(kairoId: KairoId, origin: "latest" | "explicit"): Promise<void> {
         const world = this.world;
-        const { plan } = this.previewEnable(kairoId);
-        await this.activationService.activate(world, plan);
 
-        // Update previousSession
         const registry = world.registries.get(kairoId);
         if (registry) {
             world.previousSession.set(registry.addonId, {
@@ -202,6 +213,9 @@ export class ActivationController {
                 origin,
             });
         }
+
+        const { plan } = this.previewEnable(kairoId);
+        await this.activationService.activate(world, plan);
     }
 
     async executeVersionSwitch(oldKairoId: KairoId, newKairoId: KairoId): Promise<void> {
@@ -232,6 +246,15 @@ export class ActivationController {
                 code: InactiveReasonCode.ADDON_ID_CONFLICT,
                 message: "Superseded by version switch",
                 related: [newKairoId],
+            });
+        }
+
+        // Update session before previewEnable so ConflictResolver picks the new version
+        const newRegistry = world.registries.get(newKairoId);
+        if (newRegistry) {
+            world.previousSession.set(newRegistry.addonId, {
+                version: newRegistry.version,
+                origin: "explicit",
             });
         }
 

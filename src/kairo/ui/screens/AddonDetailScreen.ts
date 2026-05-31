@@ -51,7 +51,14 @@ export class AddonDetailScreen {
             return SemVerUtils.format(world.registries.get(e.kairoId)!.version);
         });
 
-        const defaultIndex = entries.findIndex(e => e.kind === "latest");
+        const session = world.previousSession.get(addonId);
+        const defaultIndex = (() => {
+            if (session?.origin === "explicit" && activeId) {
+                const idx = entries.findIndex(e => e.kind === "version" && e.kairoId === activeId);
+                if (idx >= 0) return idx;
+            }
+            return entries.findIndex(e => e.kind === "latest");
+        })();
 
         // State of the addonId group
         const groupState = activeId
@@ -61,22 +68,33 @@ export class AddonDetailScreen {
         const versionText = activeId
             ? SemVerUtils.format(world.registries.get(activeId)!.version)
             : "-";
+        const isLatestMode = !!activeId && session?.origin !== "explicit";
 
         // Build form — label/divider も formValues に null で入るので dropdown 位置を追跡
         let fi = 0; // formIndex
         const form = new ModalFormData().title({ translate: displayRegistry.name });
 
-        form.label(displayRegistry.name);                                  fi++;
+        form.label(`${displayRegistry.name}\n§7${displayRegistry.description}§r`); fi++;
         form.divider();                                                    fi++;
-        form.label(`§7id: §r${addonId}`);                                 fi++;
         form.label({
             rawtext: [
-                { text: "§7state: §r" },
+                { text: `§7id: §r${addonId}\n§7version: §r${versionText}` },
+                ...(isLatestMode
+                    ? [{ text: " §7(" }, { translate: T.detail.latest }, { text: ")§r" }]
+                    : []
+                ),
+                { text: "\n§7state: §r" },
                 { text: STATE_COLOR[groupState] },
                 { translate: STATE_KEY[groupState] },
+                ...(displayRegistry.tags.length > 0 ? [
+                    { text: "\n§7tags: §r" },
+                    ...displayRegistry.tags.flatMap((tag, i) => [
+                        ...(i > 0 ? [{ text: ", " }] : []),
+                        { translate: `kairo.tags.${tag}` },
+                    ]),
+                ] : []),
             ],
         });                                                                fi++;
-        form.label(`§7version: §r${versionText}`);                        fi++;
         form.divider();                                                    fi++;
 
         const dropdownFormIndex = fi;
@@ -84,9 +102,18 @@ export class AddonDetailScreen {
 
         form.divider();
         const depsText = this.buildDepsText(displayRegistry);
-        form.label(depsText ?? { translate: T.detail.deps.none });
-        form.divider();
-        form.label(`§7kairoId: §r${displayId}`);
+        const dependentsText = this.buildDependentsText(addonId, world);
+        const metadataText = this.buildMetadataText(displayRegistry);
+        form.label({
+            rawtext: [
+                { text: "§7" },
+                { translate: T.detail.developer },
+                { text: `§r\n  §7id:§r ${displayId}` },
+                ...(metadataText ? [{ text: "\n" + metadataText }] : []),
+                ...(depsText ? [{ text: "\n\n" + depsText }] : []),
+                ...(dependentsText ? [{ text: "\n\n" + dependentsText }] : []),
+            ],
+        });
         form.submitButton({ translate: T.detail.submitButton });
 
         const response = await form.show(player);
@@ -128,17 +155,49 @@ export class AddonDetailScreen {
 
         const deps = Object.entries(registry.dependencies);
         if (deps.length > 0) {
-            lines.push("§7dependencies:§r");
-            for (const [id, ver] of deps) lines.push(`  §7${id}§r: ${ver}`);
+            lines.push("  §7dependencies:§r");
+            for (const [id, ver] of deps) lines.push(`    §7${id}§r: ${ver}`);
         }
 
         const opts = Object.entries(registry.optionalDependencies);
         if (opts.length > 0) {
             if (lines.length > 0) lines.push("");
-            lines.push("§7optional:§r");
-            for (const [id, ver] of opts) lines.push(`  §7${id}§r: ${ver}`);
+            lines.push("  §7optional:§r");
+            for (const [id, ver] of opts) lines.push(`    §7${id}§r: ${ver}`);
         }
 
         return lines.length > 0 ? lines.join("\n") : null;
+    }
+
+    private buildMetadataText(registry: KairoRegistry): string | null {
+        const lines: string[] = [];
+        const { authors, url, license } = registry.metadata;
+        if (authors.length > 0) lines.push(`  §7authors:§r ${authors.join(", ")}`);
+        if (url)     lines.push(`  §7url:§r ${url}`);
+        if (license) lines.push(`  §7license:§r ${license}`);
+        return lines.length > 0 ? lines.join("\n") : null;
+    }
+
+    private buildDependentsText(addonId: string, world: KairoWorldState): string | null {
+        const lines: string[] = [];
+        const seen = new Set<string>();
+
+        for (const [kairoId, rt] of world.runtimes) {
+            if (rt.state !== AddonState.ACTIVE) continue;
+            const registry = world.registries.get(kairoId);
+            if (!registry || registry.addonId === addonId) continue;
+            if (seen.has(registry.addonId)) continue;
+
+            const isRequired = addonId in registry.dependencies;
+            const isOptional = addonId in registry.optionalDependencies;
+            if (!isRequired && !isOptional) continue;
+
+            seen.add(registry.addonId);
+            const suffix = isOptional && !isRequired ? " §7(optional)§r" : "";
+            lines.push(`    §7${registry.name}§r${suffix}`);
+        }
+
+        if (lines.length === 0) return null;
+        return "  §7dependents:§r\n" + lines.join("\n");
     }
 }

@@ -5,6 +5,7 @@ import type { AddonId, AddonRuntimeState, KairoId } from "./state";
 export type PreviousSessionEntry = {
     readonly version: SemVer;
     readonly origin: "explicit" | "latest";
+    readonly disabled?: boolean;
 };
 
 export type PreviousSessionStore = Map<AddonId, PreviousSessionEntry>;
