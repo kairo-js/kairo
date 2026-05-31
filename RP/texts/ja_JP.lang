@@ -55,6 +55,7 @@ kairo.form.detail.disable=無効にする
 kairo.form.detail.latest=最新バージョン
 kairo.form.detail.submit=適用
 kairo.form.detail.deps.none=依存関係なし
+kairo.form.detail.developer=開発者向け
 
 kairo.form.unresolved.title=未解決のアドオン
 kairo.form.unresolved.close=閉じる

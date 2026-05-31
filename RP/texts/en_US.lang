@@ -55,6 +55,7 @@ kairo.form.detail.disable=Disable
 kairo.form.detail.latest=Latest Version
 kairo.form.detail.submit=Apply
 kairo.form.detail.deps.none=No dependencies
+kairo.form.detail.developer=Developer
 
 kairo.form.unresolved.title=Unresolved Addon
 kairo.form.unresolved.close=Close

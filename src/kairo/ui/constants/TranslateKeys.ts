@@ -13,7 +13,7 @@ export const T = {
         disable:      "kairo.form.detail.disable",
         latest:       "kairo.form.detail.latest",
         submitButton: "kairo.form.detail.submit",
-        kairoId:      "kairo.form.detail.kairoId",
+        developer:    "kairo.form.detail.developer",
         addonId:      "kairo.form.detail.addonId",
         state:        "kairo.form.detail.state",
         reasons:      "kairo.form.detail.reasons",
