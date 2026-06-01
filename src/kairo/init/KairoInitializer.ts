@@ -9,7 +9,7 @@ import { IdRegistryProvider } from "./IdRegistryProvider";
 import { KairoIdVerifier } from "./KairoIdVerifier";
 import { KairoInitListener } from "./KairoInitListener";
 import { KairoRegistryVerifier } from "./KairoRegistryVerifier";
-import { RegistrationController } from "./registratoin/RegistrationController";
+import { RegistrationController } from "./registration/RegistrationController";
 
 enum InitPhase {
     Discovery,

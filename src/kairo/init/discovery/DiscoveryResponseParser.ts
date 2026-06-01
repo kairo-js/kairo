@@ -1,7 +1,7 @@
 import { safeJsonParse, toError } from "@kairo-js/utils";
 import { DiscoveryResponseParseError, DiscoveryResponseParseErrorReason } from "./response/errors";
 import type { DiscoveryResponse } from "./response/schema";
-import { validateDiscoveryResponse } from "./response/vaildate";
+import { validateDiscoveryResponse } from "./response/validate";
 
 export class DiscoveryResponseParser {
     constructor() {}
