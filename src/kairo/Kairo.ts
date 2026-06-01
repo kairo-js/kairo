@@ -40,7 +40,6 @@ class Kairo {
     }
 
     private readonly onInitComplete = () => {
-        console.log("Kairo initialization complete.");
         (async (): Promise<void> => {
             if (!this.runtime) {
                 throw new KairoError(KairoErrorReason.RuntimeNotInitialized);

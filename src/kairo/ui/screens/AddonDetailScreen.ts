@@ -12,6 +12,7 @@ export type DetailResult =
     | null;
 
 type DropdownEntry =
+    | { readonly kind: "inactive" }
     | { readonly kind: "disable" }
     | { readonly kind: "latest" }
     | { readonly kind: "version"; readonly kairoId: KairoId };
@@ -38,32 +39,36 @@ export class AddonDetailScreen {
         const displayId = activeId ?? this.resolveLatest(addonId, world, selectableIds) ?? kairoIds[0]!;
         const displayRegistry = world.registries.get(displayId)!;
 
+        // State of the addonId group
+        const groupState = activeId
+            ? AddonState.ACTIVE
+            : selectableIds.length > 0 ? AddonState.INACTIVE : AddonState.UNRESOLVED;
+
         // Dropdown entries
+        const isActive = groupState === AddonState.ACTIVE;
         const entries: DropdownEntry[] = [
-            ...(disableAllowed ? [{ kind: "disable" as const }] : []),
+            ...(!isActive ? [{ kind: "inactive" as const }] : []),
+            ...(isActive && disableAllowed ? [{ kind: "disable" as const }] : []),
             { kind: "latest" },
             ...selectableIds.map(id => ({ kind: "version" as const, kairoId: id })),
         ];
 
         const labels = entries.map(e => {
-            if (e.kind === "disable") return { translate: T.detail.disable };
-            if (e.kind === "latest")  return { translate: T.detail.latest };
+            if (e.kind === "inactive") return { translate: T.detail.inactive };
+            if (e.kind === "disable")  return { translate: T.detail.disable };
+            if (e.kind === "latest")   return { translate: T.detail.latest };
             return SemVerUtils.format(world.registries.get(e.kairoId)!.version);
         });
 
         const session = world.previousSession.get(addonId);
         const defaultIndex = (() => {
+            if (!isActive) return entries.findIndex(e => e.kind === "inactive");
             if (session?.origin === "explicit" && activeId) {
                 const idx = entries.findIndex(e => e.kind === "version" && e.kairoId === activeId);
                 if (idx >= 0) return idx;
             }
             return entries.findIndex(e => e.kind === "latest");
         })();
-
-        // State of the addonId group
-        const groupState = activeId
-            ? AddonState.ACTIVE
-            : selectableIds.length > 0 ? AddonState.INACTIVE : AddonState.UNRESOLVED;
 
         const versionText = activeId
             ? SemVerUtils.format(world.registries.get(activeId)!.version)
@@ -125,6 +130,7 @@ export class AddonDetailScreen {
         const selected = entries[selectedIndex];
         if (!selected) return null;
 
+        if (selected.kind === "inactive") return null;
         if (selected.kind === "disable") return { type: "disable" };
         if (selected.kind === "latest") {
             const latestId = this.resolveLatest(addonId, world, selectableIds);

@@ -9,6 +9,7 @@ export class ActivationPlanner {
         dependencyGraph: ReadonlyMap<KairoId, ReadonlySet<KairoId>>,
         resolvedReverseDependencyGraph: ReadonlyMap<KairoId, ReadonlySet<KairoId>>,
         previousSession: PreviousSessionStore,
+        ignoreManualBlock = false,
     ): ActivationPlan {
         const activeIds = new Set<KairoId>();
         for (const [id, rt] of runtimes) {
@@ -39,7 +40,7 @@ export class ActivationPlanner {
         };
 
         const initialQueue = prioritize(
-            [...scope.keys()].filter(id => canActivate(id, availableDependencies, scope, dependencyGraph)),
+            [...scope.keys()].filter(id => canActivate(id, availableDependencies, scope, dependencyGraph, ignoreManualBlock)),
         );
 
         const queue: KairoId[] = initialQueue;
@@ -47,7 +48,7 @@ export class ActivationPlanner {
 
         while (queue.length > 0) {
             const id = queue.shift()!;
-            if (!canActivate(id, availableDependencies, scope, dependencyGraph)) continue;
+            if (!canActivate(id, availableDependencies, scope, dependencyGraph, ignoreManualBlock)) continue;
 
             orderedKairoIds.push(id);
             availableDependencies.add(id);
@@ -61,7 +62,7 @@ export class ActivationPlanner {
                 const updated = Math.max(0, current - 1);
                 inDegree.set(depId, updated);
 
-                if (updated === 0 && canActivate(depId, availableDependencies, scope, dependencyGraph)) {
+                if (updated === 0 && canActivate(depId, availableDependencies, scope, dependencyGraph, ignoreManualBlock)) {
                     newlyReady.push(depId);
                 }
             }
@@ -92,6 +93,7 @@ function canActivate(
     availableDependencies: ReadonlySet<KairoId>,
     scope: ReadonlyMap<KairoId, AddonRuntimeState>,
     dependencyGraph: ReadonlyMap<KairoId, ReadonlySet<KairoId>>,
+    ignoreManualBlock = false,
 ): boolean {
     if (!scope.has(kairoId)) return false;
 
@@ -101,7 +103,7 @@ function canActivate(
     if (runtime.inactiveReasons.has(InactiveReasonCode.ACTIVATION_TIMEOUT)) return false;
     if (runtime.inactiveReasons.has(InactiveReasonCode.ADDON_ID_CONFLICT)) return false;
     if (runtime.inactiveReasons.has(InactiveReasonCode.PRERELEASE_ONLY)) return false;
-    if (runtime.inactiveReasons.has(InactiveReasonCode.MANUALLY_DEACTIVATED)) return false;
+    if (!ignoreManualBlock && runtime.inactiveReasons.has(InactiveReasonCode.MANUALLY_DEACTIVATED)) return false;
 
     for (const depId of dependencyGraph.get(kairoId) ?? []) {
         if (!availableDependencies.has(depId)) return false;

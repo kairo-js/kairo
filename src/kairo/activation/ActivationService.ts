@@ -21,19 +21,10 @@ export class ActivationService {
         };
 
         for (const kairoId of plan.orderedKairoIds) {
-            if (context.blockedKairoIds.has(kairoId)) {
-                const registry = world.registries.get(kairoId);
-                const label = registry ? `${registry.addonId}@${registry.version.major}.${registry.version.minor}.${registry.version.patch}` : kairoId;
-                console.warn(`[Kairo] SKIPPED (dependency failed): ${label}`);
-                continue;
-            }
+            if (context.blockedKairoIds.has(kairoId)) continue;
 
             // Optional activation may have already activated this addon
             if (world.runtimes.get(kairoId)?.state === AddonState.ACTIVE) continue;
-
-            const registry = world.registries.get(kairoId);
-            const label = registry ? `${registry.addonId}@${registry.version.major}.${registry.version.minor}.${registry.version.patch}` : kairoId;
-            console.log(`[Kairo] Activating: ${label}`);
 
             const outcome = await this.executor.activate(kairoId);
 
@@ -44,14 +35,6 @@ export class ActivationService {
                 plan.resolvedReverseDependencyGraph,
                 context.blockedKairoIds,
             );
-
-            if (outcome.type === "SUCCESS") {
-                console.log(`[Kairo] Activated: ${label}`);
-            } else if (outcome.type === "FAILED") {
-                console.error(`[Kairo] FAILED: ${label} — ${outcome.reason ?? "unknown"}`);
-            } else {
-                console.error(`[Kairo] TIMEOUT: ${label}`);
-            }
 
             if (outcome.type !== "SUCCESS") continue;
 

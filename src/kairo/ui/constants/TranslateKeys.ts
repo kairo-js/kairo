@@ -11,6 +11,7 @@ export const T = {
     detail: {
         versionLabel: "kairo.form.detail.version.label",
         disable:      "kairo.form.detail.disable",
+        inactive:     "kairo.form.detail.inactive",
         latest:       "kairo.form.detail.latest",
         submitButton: "kairo.form.detail.submit",
         developer:    "kairo.form.detail.developer",

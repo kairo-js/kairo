@@ -19,6 +19,7 @@ export class ResolutionService {
     resolve(
         world: KairoWorldState,
         scope: ReadonlySet<KairoId>,
+        ignoreManualBlock = false,
     ): ActivationPlan {
         // Step 0: reset resolution-generated reasons
         resetReasons(scope, world.runtimes);
@@ -81,24 +82,8 @@ export class ResolutionService {
             ctx.dependencyGraph,
             ctx.resolvedReverseDependencyGraph,
             world.previousSession,
+            ignoreManualBlock,
         );
-
-        for (const [kairoId, runtime] of world.runtimes) {
-            if (!scope.has(kairoId)) continue;
-            const registry = world.registries.get(kairoId);
-            const label = registry ? `${registry.addonId}@${registry.version.major}.${registry.version.minor}.${registry.version.patch}` : kairoId;
-            if (runtime.state === AddonState.UNRESOLVED) {
-                const reasons = [...runtime.unresolvedReasons.keys()].join(", ");
-                console.warn(`[Kairo] UNRESOLVED: ${label} (${reasons})`);
-            } else if (runtime.inactiveReasons.size > 0) {
-                const reasons = [...runtime.inactiveReasons.keys()].join(", ");
-                console.warn(`[Kairo] INACTIVE: ${label} (${reasons})`);
-            }
-        }
-
-        if (cyclicNodes.size > 0) {
-            console.warn(`[Kairo] Circular dependencies detected: ${cyclicNodes.size} addon(s) affected`);
-        }
 
         return plan;
     }

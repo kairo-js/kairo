@@ -52,6 +52,7 @@ kairo.form.addon.unresolved=未解決
 
 kairo.form.detail.version.label=バージョン
 kairo.form.detail.disable=無効にする
+kairo.form.detail.inactive=現在無効
 kairo.form.detail.latest=最新バージョン
 kairo.form.detail.submit=適用
 kairo.form.detail.deps.none=依存関係なし

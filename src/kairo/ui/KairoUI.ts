@@ -34,7 +34,6 @@ export class KairoUI {
         // kairo 自身は無効化不可（バージョン切替のみ）
         const disableAllowed = selectedAddonId !== "kairo";
         const result = await this.addonDetail.show(player, selectedAddonId, world, disableAllowed);
-        console.log(`[Kairo UI] Detail result: ${JSON.stringify(result)}`);
         if (!result) return;
 
         if (result.type === "disable") {
