@@ -1,5 +1,6 @@
 import { KairoRouter, router } from "@kairo-js/router";
 import { SeedRandom, SemVerUtils } from "@kairo-js/utils";
+import type { AddonProperties } from "@kairo-js/properties";
 import { CommandPermissionLevel, CustomCommandParamType, CustomCommandStatus, system } from "@minecraft/server";
 import type { Player } from "@minecraft/server";
 import { AddonState } from "./activation/types/state";
@@ -18,7 +19,8 @@ class Kairo {
 
     constructor(public readonly router: KairoRouter) {}
 
-    init(): void {
+    init(properties: AddonProperties): void {
+        this.router.init(properties);
         this.runtime = new KairoRuntime();
 
         const initializer = new KairoInitializer(
