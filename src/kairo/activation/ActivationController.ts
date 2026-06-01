@@ -24,9 +24,15 @@ export type DisablePreview = {
     readonly cascadeVictims: readonly KairoId[];
 };
 
+export type ImplicitVersionSwitch = {
+    readonly from: KairoId;
+    readonly to: KairoId;
+};
+
 export type EnablePreview = {
     readonly plan: ActivationPlan;
     readonly toActivate: readonly KairoId[];
+    readonly implicitVersionSwitches: readonly ImplicitVersionSwitch[];
 };
 
 export type VersionSwitchPreview = {
@@ -111,13 +117,30 @@ export class ActivationController {
     previewEnable(kairoId: KairoId): EnablePreview {
         const world = this.world;
         const scope = this.buildManualActivateScope(kairoId);
+
+        // Snapshot active state before resolve to detect implicit version switches
+        const preActiveIds = new Set<KairoId>();
+        for (const [id, rt] of world.runtimes) {
+            if (rt.state === AddonState.ACTIVE) preActiveIds.add(id);
+        }
+
         const plan = this.resolutionService.resolve(world, scope, true);
 
         const toActivate = plan.orderedKairoIds.filter(id => {
             return world.runtimes.get(id)?.state === AddonState.INACTIVE;
         });
 
-        return { plan, toActivate };
+        // Detect implicit version switches: plan members that displaced a previously-ACTIVE version
+        const implicitVersionSwitches: ImplicitVersionSwitch[] = [];
+        for (const planId of plan.orderedKairoIds) {
+            const planReg = world.registries.get(planId);
+            if (!planReg) continue;
+            const displaced = [...(world.addonIdIndex.get(planReg.addonId) ?? [])]
+                .find(id => id !== planId && preActiveIds.has(id));
+            if (displaced) implicitVersionSwitches.push({ from: displaced, to: planId });
+        }
+
+        return { plan, toActivate, implicitVersionSwitches };
     }
 
     previewVersionSwitch(newKairoId: KairoId): VersionSwitchPreview {
@@ -197,17 +220,40 @@ export class ActivationController {
     }
 
     async executeEnable(kairoId: KairoId, origin: "latest" | "explicit"): Promise<void> {
+        const { plan, implicitVersionSwitches } = this.previewEnable(kairoId);
+        await this.executeEnableWithPlan(kairoId, origin, plan, implicitVersionSwitches);
+    }
+
+    async executeEnableWithPlan(
+        kairoId: KairoId,
+        origin: "latest" | "explicit",
+        plan: ActivationPlan,
+        implicitVersionSwitches: readonly ImplicitVersionSwitch[],
+    ): Promise<void> {
         const world = this.world;
 
         const registry = world.registries.get(kairoId);
         if (registry) {
-            world.previousSession.set(registry.addonId, {
-                version: registry.version,
-                origin,
-            });
+            world.previousSession.set(registry.addonId, { version: registry.version, origin });
         }
 
-        const { plan } = this.previewEnable(kairoId);
+        // Deactivate displaced versions before activating the plan
+        for (const { from: oldId } of implicitVersionSwitches) {
+            const { cascadeVictims } = this.previewDisable(oldId);
+            for (const victimId of cascadeVictims) {
+                const victimRt = world.runtimes.get(victimId);
+                if (!victimRt || victimRt.state !== AddonState.ACTIVE) continue;
+                await this.deactivationExecutor.deactivate(victimId);
+                setInactive(victimRt, {
+                    code: InactiveReasonCode.CASCADE_DEACTIVATED,
+                    message: `Dependency ${oldId} was switched`,
+                    related: [oldId],
+                });
+            }
+            // Still running in Minecraft despite in-memory INACTIVE state set by ConflictResolver
+            await this.deactivationExecutor.deactivate(oldId);
+        }
+
         await this.activationService.activate(world, plan);
     }
 

@@ -9,6 +9,7 @@ export type ResolutionContext = {
     readonly runtimes: ReadonlyMap<KairoId, AddonRuntimeState>;
     readonly addonIdIndex: ReadonlyMap<AddonId, ReadonlySet<KairoId>>;
     readonly previousSession: PreviousSessionStore;
+    readonly ignoreManualBlock: boolean;
 
     declaredDependencyGraph: Map<KairoId, Set<AddonDependencySpec>>;
     dependencyGraph: Map<KairoId, Set<KairoId>>;

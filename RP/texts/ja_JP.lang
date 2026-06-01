@@ -67,4 +67,5 @@ kairo.form.confirm.yes=はい
 kairo.form.confirm.no=いいえ
 kairo.form.confirm.disable.cascade=このアドオンを無効化すると、以下のアドオンも無効化されます：
 kairo.form.confirm.enable.deps=以下の前提アドオンも一緒に有効化されます：
+kairo.form.confirm.enable.version.switch=このアドオンを有効化するには、以下の依存ライブラリのバージョンを変更します：
 kairo.form.confirm.version.switch.cascade=このバージョンに切り替えると、互換性のない以下のアドオンが無効化されます：

@@ -97,10 +97,21 @@ export class KairoUI {
         }
 
         // Fresh enable
-        const { toActivate } = this.controller.previewEnable(newKairoId);
+        const { plan, toActivate, implicitVersionSwitches } = this.controller.previewEnable(newKairoId);
         const depsToActivate = toActivate.filter(id => id !== newKairoId);
 
-        if (depsToActivate.length > 0) {
+        if (implicitVersionSwitches.length > 0) {
+            const names = implicitVersionSwitches.map(({ from, to }) => {
+                const fromReg = world.registries.get(from);
+                const toReg = world.registries.get(to);
+                const name = toReg?.name ?? to;
+                const fromVer = fromReg ? SemVerUtils.format(fromReg.version) : from;
+                const toVer = toReg ? SemVerUtils.format(toReg.version) : to;
+                return `${name}  ${fromVer} > ${toVer}`;
+            });
+            const confirmed = await this.confirm.show(player, T.confirm.enableVersionSwitch, names);
+            if (!confirmed) return;
+        } else if (depsToActivate.length > 0) {
             const names = depsToActivate.map(id => {
                 const reg = world.registries.get(id);
                 return reg ? reg.name : id;
@@ -109,6 +120,6 @@ export class KairoUI {
             if (!confirmed) return;
         }
 
-        await this.controller.executeEnable(newKairoId, origin);
+        await this.controller.executeEnableWithPlan(newKairoId, origin, plan, implicitVersionSwitches);
     }
 }

@@ -67,4 +67,5 @@ kairo.form.confirm.yes=Yes
 kairo.form.confirm.no=No
 kairo.form.confirm.disable.cascade=Disabling this addon will also disable the following addons:
 kairo.form.confirm.enable.deps=The following addons are required and will also be enabled:
+kairo.form.confirm.enable.version.switch=To enable this addon, the following dependency versions will be switched:
 kairo.form.confirm.version.switch.cascade=Switching to this version will disable the following incompatible addons:

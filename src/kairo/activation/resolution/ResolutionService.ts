@@ -50,6 +50,7 @@ export class ResolutionService {
             runtimes: world.runtimes,
             addonIdIndex: world.addonIdIndex,
             previousSession: world.previousSession,
+            ignoreManualBlock,
             declaredDependencyGraph,
             dependencyGraph: new Map(),
             resolvedReverseDependencyGraph: new Map(),

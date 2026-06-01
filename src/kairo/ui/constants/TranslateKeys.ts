@@ -31,8 +31,9 @@ export const T = {
         title:              "kairo.form.confirm.title",
         yes:                "kairo.form.confirm.yes",
         no:                 "kairo.form.confirm.no",
-        disableCascade:     "kairo.form.confirm.disable.cascade",
-        enableDeps:         "kairo.form.confirm.enable.deps",
+        disableCascade:       "kairo.form.confirm.disable.cascade",
+        enableDeps:           "kairo.form.confirm.enable.deps",
+        enableVersionSwitch:  "kairo.form.confirm.enable.version.switch",
         versionSwitchCascade: "kairo.form.confirm.version.switch.cascade",
     },
 } as const;

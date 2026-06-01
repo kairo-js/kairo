@@ -36,6 +36,15 @@ export class ConflictResolver {
     private pickWinner(group: Set<KairoId>, ctx: ResolutionContext): KairoId {
         const ids = [...group];
 
+        // Priority 0 (manual enable only): prefer version that is required by another addon in scope
+        if (ctx.ignoreManualBlock) {
+            for (const id of ids) {
+                for (const deps of ctx.dependencyGraph.values()) {
+                    if (deps.has(id)) return id;
+                }
+            }
+        }
+
         // Priority 1: previous session explicit version
         for (const id of ids) {
             const registry = ctx.registries.get(id);
