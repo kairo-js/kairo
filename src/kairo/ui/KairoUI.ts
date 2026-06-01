@@ -19,7 +19,7 @@ export class KairoUI {
     async open(player: Player): Promise<void> {
         const world = this.controller.world;
 
-        const selectedAddonId = await this.addonList.show(player, world, this.controller.activationOrder);
+        const selectedAddonId = await this.addonList.show(player, world);
         if (!selectedAddonId) return;
 
         // Check if all versions are UNRESOLVED

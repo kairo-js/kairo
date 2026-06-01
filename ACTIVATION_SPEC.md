@@ -378,6 +378,7 @@ enum InactiveReasonCode {
   // Resolution-generated reasons（Resolution 開始時にリセット）
   DEPENDENCY_INACTIVE  = "DEPENDENCY_INACTIVE",
   ADDON_ID_CONFLICT    = "ADDON_ID_CONFLICT",
+  CONFLICTS_WITH       = "CONFLICTS_WITH",     // cross-addonId conflicts 宣言による競合
   PRERELEASE_ONLY      = "PRERELEASE_ONLY",
 }
 
@@ -428,9 +429,10 @@ type ResolutionContext = {
   // Step 3 で DependencyResolver が同時に構築する解決済み逆グラフ（scope-local）
   // Step 4 BFS と Activation failure cascade（Resolution 直後）に使用
   resolvedReverseDependencyGraph: Map<KairoId, Set<KairoId>>;
-  unresolvedQueue:        KairoId[];
-  conflictGroups:         Map<AddonId, Set<KairoId>>;
-  activationPlan:         ActivationPlan;
+  unresolvedQueue:           KairoId[];
+  conflictGroups:            Map<AddonId, Set<KairoId>>;         // 同一 addonId 競合グループ
+  crossAddonConflictPairs:   Array<[KairoId, KairoId]>;          // conflicts 宣言由来の競合ペア
+  activationPlan:            ActivationPlan;
 };
 ```
 
@@ -489,6 +491,7 @@ function canActivate(
   if (runtime.state !== AddonState.INACTIVE)                                  return false;
   if (runtime.inactiveReasons.has(InactiveReasonCode.ACTIVATION_TIMEOUT))    return false;
   if (runtime.inactiveReasons.has(InactiveReasonCode.ADDON_ID_CONFLICT))     return false;
+  if (runtime.inactiveReasons.has(InactiveReasonCode.CONFLICTS_WITH))        return false;
   if (runtime.inactiveReasons.has(InactiveReasonCode.PRERELEASE_ONLY))       return false;
   if (runtime.inactiveReasons.has(InactiveReasonCode.MANUALLY_DEACTIVATED))  return false;
   // CASCADE_DEACTIVATED はブロックしない（条件が整えば自動復帰）
@@ -520,6 +523,7 @@ reasons は「いつ生成されるか」によって2種類に分類する。
 |---|---|
 | PRERELEASE_ONLY | Resolution Step 3 |
 | ADDON_ID_CONFLICT | Resolution Step 6 |
+| CONFLICTS_WITH | Resolution Step 6 |
 | DEPENDENCY_INACTIVE | Resolution Step 3 / Activation Phase |
 | DEPENDENCY_NOT_FOUND | Resolution Step 3 |
 | VERSION_NOT_SATISFIED | Resolution Step 3 |
@@ -541,6 +545,7 @@ for each runtime in scope:
   // resolution-generated inactive reasons を削除
   remove PRERELEASE_ONLY from inactiveReasons
   remove ADDON_ID_CONFLICT from inactiveReasons
+  remove CONFLICTS_WITH from inactiveReasons
   remove DEPENDENCY_INACTIVE from inactiveReasons
 
 保持:
@@ -637,6 +642,23 @@ semver の build メタデータ（`+` 以降）は完全に無視する。
 - optional 依存先が `UNRESOLVED` の場合 → 無視する
 - optional の循環依存: `UNRESOLVED` にはしない（ユーザーの責任）
   - ただし循環に巻き込まれた optional 依存先は起動しない
+
+### conflicts（競合宣言）
+
+- `AddonProperties` および `KairoRegistry` の両方に `conflicts` フィールドを追加する
+- `conflicts: { "other-addon": "^1.0.0" }` のように addonId とバージョン範囲で宣言する
+- バージョン範囲は `dependencies` と同じ記法を使用する
+- 宣言したアドオンと指定先アドオンは同時に `ACTIVE` にできない
+- **初期 activation では両者とも `INACTIVE`**（自動選択なし。ユーザーが手動で選択する）
+- `dependencies` と異なり「共存しない」という宣言であり、依存先不在でも起動は妨げない
+- UI のアドオン詳細画面に競合相手の一覧を表示する
+
+```typescript
+// 例：b-manager が a-manager の置き換えとして宣言する
+conflicts: { "a-manager": "*" }
+// startup では a-manager も b-manager も INACTIVE（CONFLICTS_WITH）になる
+// ユーザーが手動でどちらかを activate する
+```
 
 ### ~~peer~~（削除済み）
 
@@ -767,10 +789,11 @@ while queue is not empty:
 
 ---
 
-### Step 5: addonId conflict detection（detect のみ）
+### Step 5: conflict detection（detect のみ）
 
-責務: 同一 addonId のグループを作る。状態・reasons は変更しない。
+責務: 競合グループを作る。状態・reasons は変更しない。
 
+**[1] 同一 addonId 競合**
 ```
 同一 addonId でグルーピング
 
@@ -781,11 +804,22 @@ group size > 1（競合あり）:
   conflict group として Resolution ローカルに保存
 ```
 
+**[2] cross-addonId 競合（conflicts 宣言）**
+```
+for each addon A in scope:
+  for each (targetAddonId, versionRange) in A.registry.conflicts:
+    candidates = scope 内の targetAddonId を持つ addon のうち
+                 versionMatcher(versionRange, addon.version) == true のもの
+    for each B in candidates:
+      ctx.crossAddonConflictPairs.push([A, B])
+      // 重複ペア (B, A) が既に追加されていても両側宣言として Step 6 で正しく処理される
+```
+
 ---
 
 ### Step 6: conflict resolution（deterministic tiebreak）
 
-責務: Step 5 で保存された conflict group を以下の優先順で解消する。
+責務: Step 5 で保存された conflict group および conflict pair を以下の優先順で解消する。
 
 ```
 for each conflict group:
@@ -817,6 +851,20 @@ for each conflict group:
 **winner の state は変更しない**（INACTIVE のまま、activation plan で起動される）。
 loser は `setInactive(ADDON_ID_CONFLICT)` により除外される。
 conflict は `ADDON_ID_CONFLICT` reason によってのみ表現する。
+
+**[2] cross-addonId conflict pair の解消**
+
+初期 activation では自動選択を行わない。ユーザーが手動で選択する。
+`CONFLICTS_WITH` reason の `related` フィールドに競合相手の addonId を格納する（UI 表示用）。
+
+```
+for each conflict pair (A, B):
+  setInactive(A, { code: CONFLICTS_WITH, message: "...", related: [B.addonId] })
+  setInactive(B, { code: CONFLICTS_WITH, message: "...", related: [A.addonId] })
+  // 両者とも INACTIVE。activation plan には含めない。
+  // ACTIVE だった場合も setInactive で確実に落とす。
+  // 前回セッションで A が ACTIVE だったとしても、conflict 検出が優先される。
+```
 
 ---
 
@@ -938,9 +986,13 @@ manual activate は **world-wide resolution を再実行しない**。
 ```
 subgraph =
   dependency closure of targetAddon（registry spec を再帰的に辿る。versionMatcher で範囲外を除外）
-  + 全 closure ノードの same addonId グループ（conflict 検出のため）
+  + 全 closure ノードの same addonId グループ（addonId conflict 検出のため）
   + 各 same addonId グループの currently ACTIVE なバージョン（scope に含めることで mutate 許可とする）
+  + targetAddon の conflicts 宣言に該当する ACTIVE なアドオン（scope に含めることで deactivate を許可）
 ```
+
+conflicts 相手を scope に含めることで、手動 activate 時に競合相手が ACTIVE なままになる事態を防ぐ。
+Step 6 の cross-addonId conflict 解消ロジックが競合相手を `setInactive(CONFLICTS_WITH)` できるようになる。
 
 **scope に入れた addon は mutate してよい。** ACTIVE な競合バージョンを scope に明示的に含めることで、`setInactive(CASCADE_DEACTIVATED)` が scope isolation 違反にならない。
 
@@ -959,6 +1011,40 @@ activate(targetAddon):
 **重要: scope isolation の副作用**
 scope 外のアドオン（subgraph に含まれなかったもの）は一切変更しない。
 例えば scope 内の addon A が UNRESOLVED になっても、scope 外で A に依存している addon X はそのまま ACTIVE のままになる。これは仕様上の制約であり、意図的な設計である（manual activate は世界全体の依存を修復しない）。
+
+---
+
+## conflicts × Manual Activate
+
+### 初期状態
+
+startup activation で conflict が検出された場合、競合する両アドオンは `INACTIVE`（`CONFLICTS_WITH`）になる。
+ユーザーが UI で明示的にどちらかを選択するまで両方 INACTIVE のまま。
+
+### ユーザーがどちらかを手動 activate する場合
+
+**ケース 1: A を activate（B は INACTIVE）**
+```
+通常の manual activate フローを実行。
+B は INACTIVE（CONFLICTS_WITH）のまま変化しない。
+```
+
+**ケース 2: A が ACTIVE の状態で B を activate しようとした場合**
+```
+UI: B の Apply フォームで確認ダイアログを表示
+  「B は [A] と競合しています。有効化すると [A] は無効になります。続けますか？」
+
+ユーザーがキャンセル → 何もしない
+
+ユーザーが確認 →
+  1. A を deactivate（CASCADE_DEACTIVATED）
+  2. A に依存するアドオンを cascade deactivate（通常の cascade deactivate と同様）
+  3. B の subgraph resolution → activation 実行
+```
+
+### conflicts 解消後の再 activate
+
+A を deactivate して B を activate した後、ユーザーが再度 A を activate したい場合は通常の manual activate フローが使用できる（CONFLICTS_WITH は Resolution 開始時にリセットされ、再評価される）。
 
 ---
 
