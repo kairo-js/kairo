@@ -67,7 +67,6 @@ export class ActivationController {
     startupResolve(): ActivationPlan {
         this._world = this.buildWorldState();
         this._world.cachedDeclaredReverseGraph = this.buildReverseGraph(this._world);
-        console.log(`[Kairo] Resolution Phase: ${this._world.runtimes.size} addon(s) registered`);
         const scope = new Set<KairoId>();
         for (const kairoId of this._world.runtimes.keys()) {
             const registry = this._world.registries.get(kairoId);
@@ -77,14 +76,11 @@ export class ActivationController {
         }
         const plan = this.resolutionService.resolve(this._world, scope);
         this._activationOrder = plan.orderedKairoIds;
-        console.log(`[Kairo] Resolution Phase complete: ${plan.orderedKairoIds.length} addon(s) scheduled for activation`);
         return plan;
     }
 
     async startupActivate(plan: ActivationPlan): Promise<void> {
-        console.log(`[Kairo] Activation Phase: starting`);
         await this.activationService.activate(this.world, plan);
-        console.log(`[Kairo] Activation Phase complete`);
     }
 
     // ── Preview methods ──────────────────────────────────────────
@@ -115,7 +111,7 @@ export class ActivationController {
     previewEnable(kairoId: KairoId): EnablePreview {
         const world = this.world;
         const scope = this.buildManualActivateScope(kairoId);
-        const plan = this.resolutionService.resolve(world, scope);
+        const plan = this.resolutionService.resolve(world, scope, true);
 
         const toActivate = plan.orderedKairoIds.filter(id => {
             return world.runtimes.get(id)?.state === AddonState.INACTIVE;
@@ -166,7 +162,6 @@ export class ActivationController {
         const world = this.world;
         const registry = world.registries.get(kairoId);
         const label = registry ? `${registry.addonId}@${registry.version.major}.${registry.version.minor}.${registry.version.patch}` : kairoId;
-        console.log(`[Kairo UI] Disabling: ${label}`);
 
         const { cascadeVictims } = this.previewDisable(kairoId);
 
@@ -184,14 +179,12 @@ export class ActivationController {
         }
 
         const success = await this.deactivationExecutor.deactivate(kairoId);
-        console.log(`[Kairo UI] Deactivate result: ${success ? "success" : "failed"}`);
         const rt = world.runtimes.get(kairoId);
         if (rt && success) {
             setInactive(rt, {
                 code: InactiveReasonCode.MANUALLY_DEACTIVATED,
                 message: "Manually deactivated",
             });
-            console.log(`[Kairo UI] Disabled: ${label}`);
             const registry = world.registries.get(kairoId);
             if (registry) {
                 world.previousSession.set(registry.addonId, {

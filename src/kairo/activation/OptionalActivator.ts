@@ -69,20 +69,8 @@ export class OptionalActivator {
             for (const id of plan.orderedKairoIds) {
                 if (blockedKairoIds.has(id)) continue;
 
-                const r = world.registries.get(id);
-                const label = r ? `${r.addonId}@${r.version.major}.${r.version.minor}.${r.version.patch}` : id;
-                console.log(`[Kairo] Activating (optional): ${label}`);
-
                 const outcome = await this.executor.activate(id);
                 outcomes.set(id, outcome);
-
-                if (outcome.type === "SUCCESS") {
-                    console.log(`[Kairo] Activated (optional): ${label}`);
-                } else if (outcome.type === "FAILED") {
-                    console.warn(`[Kairo] FAILED (optional): ${label} — ${outcome.reason ?? "unknown"}`);
-                } else {
-                    console.warn(`[Kairo] TIMEOUT (optional): ${label}`);
-                }
 
                 if (outcome.type !== "SUCCESS") {
                     const deps = plan.resolvedReverseDependencyGraph.get(id);
