@@ -1,8 +1,13 @@
 import { KairoRouter, router } from "@kairo-js/router";
 import { SeedRandom, SemVerUtils } from "@kairo-js/utils";
 import type { AddonProperties } from "@kairo-js/properties";
-import { CommandPermissionLevel, CustomCommandParamType, CustomCommandStatus, system } from "@minecraft/server";
-import type { Player } from "@minecraft/server";
+import {
+    CommandPermissionLevel,
+    CustomCommandParamType,
+    CustomCommandStatus,
+    system,
+} from "@minecraft/server";
+import type { CustomCommandOrigin, Player } from "@minecraft/server";
 import { AddonState } from "./activation/types/state";
 import { KairoRuntime } from "../minecraft/KairoRuntime";
 import { ActivationController } from "./activation/ActivationController";
@@ -35,8 +40,14 @@ class Kairo {
             initializer.onWorldLoad();
         });
 
-        this.router.beforeEvents.startup.subscribe(ev => {
-            ev.customCommandRegistry.registerEnum("kairo:addons_subcommand", ["list", "open", "enable", "disable", "status"]);
+        this.router.beforeEvents.startup.subscribe((ev) => {
+            ev.customCommandRegistry.registerEnum("kairo:addons_subcommand", [
+                "list",
+                "open",
+                "enable",
+                "disable",
+                "status",
+            ]);
             ev.customCommandRegistry.registerCommand(
                 {
                     name: "kairo:addons",
@@ -51,21 +62,35 @@ class Kairo {
                         { name: "version", type: CustomCommandParamType.String },
                     ],
                 },
-                (origin, subcommand, addonId?, version?) => {
+                (origin: CustomCommandOrigin, subcommand: string, addonId?: string, version?: string) => {
                     const player = origin.sourceEntity as Player;
                     if (subcommand === "list") {
-                        system.run(() => { this.commandList(player); });
+                        system.run(() => {
+                            this.commandList(player);
+                        });
                     } else if (subcommand === "open") {
-                        system.run(() => { this.ui?.open(player); });
+                        system.run(() => {
+                            this.ui?.open(player);
+                        });
                     } else if (subcommand === "enable" && addonId && version) {
-                        system.run(() => { void this.commandEnable(addonId as string, version as string); });
+                        system.run(() => {
+                            void this.commandEnable(addonId, version);
+                        });
                     } else if (subcommand === "disable" && addonId) {
                         if (addonId === "kairo") {
-                            return { status: CustomCommandStatus.Failure, message: "Kairo cannot be disabled. Use 'enable' to switch versions." };
+                            return {
+                                status: CustomCommandStatus.Failure,
+                                message:
+                                    "Kairo cannot be disabled. Use 'enable' to switch versions.",
+                            };
                         }
-                        system.run(() => { void this.commandDisable(addonId as string); });
+                        system.run(() => {
+                            void this.commandDisable(addonId);
+                        });
                     } else if (subcommand === "status" && addonId) {
-                        system.run(() => { this.commandStatus(player, addonId as string); });
+                        system.run(() => {
+                            this.commandStatus(player, addonId);
+                        });
                     }
                     return { status: CustomCommandStatus.Success };
                 },
@@ -82,9 +107,18 @@ class Kairo {
         const world = this.activationController.world;
 
         type GroupState = "active" | "inactive" | "unresolved";
-        const STATE_PRIORITY: Record<GroupState, number> = { active: 0, inactive: 1, unresolved: 2 };
+        const STATE_PRIORITY: Record<GroupState, number> = {
+            active: 0,
+            inactive: 1,
+            unresolved: 2,
+        };
 
-        const groups: { addonId: string; state: GroupState; name: string; activeVersion?: string }[] = [];
+        const groups: {
+            addonId: string;
+            state: GroupState;
+            name: string;
+            activeVersion?: string;
+        }[] = [];
         for (const [addonId, kairoIds] of world.addonIdIndex) {
             let hasActive = false;
             let hasInactive = false;
@@ -103,7 +137,11 @@ class Kairo {
                 if (rt?.state === AddonState.INACTIVE) hasInactive = true;
             }
 
-            const state: GroupState = hasActive ? "active" : hasInactive ? "inactive" : "unresolved";
+            const state: GroupState = hasActive
+                ? "active"
+                : hasInactive
+                  ? "inactive"
+                  : "unresolved";
             groups.push({ addonId, state, name, activeVersion });
         }
 
@@ -113,8 +151,8 @@ class Kairo {
             return a.addonId.localeCompare(b.addonId);
         });
 
-        const lines = groups.map(g => {
-            if (g.state === "active")     return `  §a${g.name} §7${g.activeVersion}`;
+        const lines = groups.map((g) => {
+            if (g.state === "active") return `  §a${g.name} §7${g.activeVersion}`;
             if (g.state === "unresolved") return `  §c${g.name} §7(unresolved)`;
             return `  §e${g.name} §7(inactive)`;
         });
@@ -159,13 +197,15 @@ class Kairo {
         const kairoIds = world.addonIdIndex.get(addonId);
         if (!kairoIds) return;
 
-        const newKairoId = [...kairoIds].find(id => {
+        const newKairoId = [...kairoIds].find((id) => {
             const reg = world.registries.get(id);
             return reg ? SemVerUtils.format(reg.version) === versionStr : false;
         });
         if (!newKairoId) return;
 
-        const currentActiveId = [...kairoIds].find(id => world.runtimes.get(id)?.state === AddonState.ACTIVE);
+        const currentActiveId = [...kairoIds].find(
+            (id) => world.runtimes.get(id)?.state === AddonState.ACTIVE,
+        );
         if (currentActiveId === newKairoId) return;
 
         if (currentActiveId) {
@@ -182,7 +222,9 @@ class Kairo {
         const kairoIds = world.addonIdIndex.get(addonId);
         if (!kairoIds) return;
 
-        const activeId = [...kairoIds].find(id => world.runtimes.get(id)?.state === AddonState.ACTIVE);
+        const activeId = [...kairoIds].find(
+            (id) => world.runtimes.get(id)?.state === AddonState.ACTIVE,
+        );
         if (!activeId) return;
 
         await this.activationController.executeDisable(activeId);
