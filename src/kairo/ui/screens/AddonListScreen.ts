@@ -2,7 +2,7 @@ import type { Player } from "@minecraft/server";
 import { ActionFormData } from "@minecraft/server-ui";
 import { SemVerUtils } from "@kairo-js/utils";
 import type { KairoWorldState } from "../../activation/types/world";
-import { AddonState, type KairoId } from "../../activation/types/state";
+import { AddonState } from "../../activation/types/state";
 import { T } from "../constants/TranslateKeys";
 
 type GroupState = "active" | "inactive" | "unresolved";
@@ -35,9 +35,8 @@ export class AddonListScreen {
     async show(
         player: Player,
         world: KairoWorldState,
-        activationOrder: readonly KairoId[],
     ): Promise<string | null> {
-        const groups = this.buildAndSortGroups(world, activationOrder);
+        const groups = this.buildAndSortGroups(world);
 
         const form = new ActionFormData()
             .title({ translate: T.addonList.title });
@@ -78,18 +77,7 @@ export class AddonListScreen {
         return groups[response.selection]?.addonId ?? null;
     }
 
-    private buildAndSortGroups(
-        world: KairoWorldState,
-        activationOrder: readonly KairoId[],
-    ): AddonGroup[] {
-        // Build addonId → earliest index in activation order
-        const orderIndex = new Map<string, number>();
-        for (let i = 0; i < activationOrder.length; i++) {
-            const reg = world.registries.get(activationOrder[i]!);
-            if (!reg) continue;
-            if (!orderIndex.has(reg.addonId)) orderIndex.set(reg.addonId, i);
-        }
-
+    private buildAndSortGroups(world: KairoWorldState): AddonGroup[] {
         const groups: AddonGroup[] = [];
 
         for (const [addonId, kairoIds] of world.addonIdIndex) {
@@ -114,11 +102,6 @@ export class AddonListScreen {
         groups.sort((a, b) => {
             const stateDiff = STATE_PRIORITY[a.state] - STATE_PRIORITY[b.state];
             if (stateDiff !== 0) return stateDiff;
-
-            const aIdx = orderIndex.get(a.addonId) ?? Infinity;
-            const bIdx = orderIndex.get(b.addonId) ?? Infinity;
-            if (aIdx !== bIdx) return aIdx - bIdx;
-
             return a.addonId.localeCompare(b.addonId);
         });
 
