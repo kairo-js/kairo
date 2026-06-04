@@ -7,7 +7,7 @@ export class AddonRegistrationManager {
     private readonly validator = new RegistrationResponseValidator();
     constructor() {}
 
-    resolveKairoRegistry(message: string, currentTick: number): KairoRegistry {
+    resolveRegistration(message: string, currentTick: number): KairoRegistry {
         const response = this.parser.parse(message);
         this.validator.validateRequest(response, currentTick);
         return response.kairoRegistry;

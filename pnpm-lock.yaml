@@ -12,8 +12,8 @@ importers:
         specifier: 1.2.1
         version: 1.2.1
       '@kairo-js/router':
-        specifier: file:../../packages/kairo-router
-        version: file:../../packages/kairo-router(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.7.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))
+        specifier: link:../../packages/kairo-router
+        version: link:../../packages/kairo-router
       '@kairo-js/utils':
         specifier: 1.2.1
         version: 1.2.1
@@ -257,12 +257,6 @@ packages:
 
   '@kairo-js/properties@1.2.1':
     resolution: {integrity: sha512-/jdu+th3fY+l1TB9vRi/xr/Zx8E5zlQiJRW4S/KPD1fv+kckDt0PJavFtFsXAr3EGSwHitzDOIz+0Oyjy//pow==}
-
-  '@kairo-js/router@file:../../packages/kairo-router':
-    resolution: {directory: ../../packages/kairo-router, type: directory}
-    peerDependencies:
-      '@minecraft/server': ^2.7.0
-      '@minecraft/server-ui': ^2.0.0
 
   '@kairo-js/utils@1.2.1':
     resolution: {integrity: sha512-L5lksOPDRhNiwl3qwNzF0HpGI1FcVciBXl/eCWbcYaP6q8PHtFWfDse1o87Y7QzT9BR93open11R3zLxBi6zUw==}
@@ -531,16 +525,6 @@ snapshots:
       dequal: 2.0.3
 
   '@kairo-js/properties@1.2.1': {}
-
-  '@kairo-js/router@file:../../packages/kairo-router(@minecraft/server-ui@2.0.0(@minecraft/vanilla-data@1.26.2))(@minecraft/server@2.7.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2))':
-    dependencies:
-      '@kairo-js/properties': 1.2.1
-      '@kairo-js/utils': 1.2.1
-      '@minecraft/server': 2.7.0(@minecraft/common@1.2.0)(@minecraft/vanilla-data@1.26.2)
-      '@minecraft/server-ui': 2.0.0(@minecraft/vanilla-data@1.26.2)
-      '@sinclair/typebox': 0.34.49
-      fast-json-stringify: 6.4.0
-      seedrandom: 3.0.5
 
   '@kairo-js/utils@1.2.1':
     dependencies:

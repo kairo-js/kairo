@@ -28,7 +28,9 @@ export const properties: AddonProperties = {
             version: "2.0.0",
         },
     ],
-    optionalDependencies: {},
+    optionalDependencies: {
+        "kairo-database": "^1.0.0",
+    },
     dependencies: {
         /**
          * id: version (string) // "kairo": "1.0.0"

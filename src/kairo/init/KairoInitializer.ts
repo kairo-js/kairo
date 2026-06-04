@@ -1,5 +1,6 @@
 import type { Disposable } from "@kairo-js/router";
-import { type Random } from "@kairo-js/utils";
+import { SemVerUtils, type Random } from "@kairo-js/utils";
+import type { SemVer } from "@kairo-js/properties";
 import type { KairoRuntime } from "../../minecraft/KairoRuntime";
 import { KairoInitError, KairoInitErrorReason } from "../errors/KairoInitError";
 import type { KairoRegistryIndex } from "../KairoRegistryIndex";
@@ -10,17 +11,33 @@ import { KairoIdVerifier } from "./KairoIdVerifier";
 import { KairoInitListener } from "./KairoInitListener";
 import { KairoRegistryVerifier } from "./KairoRegistryVerifier";
 import { RegistrationController } from "./registration/RegistrationController";
+import { ApiManifestController } from "./api/ApiManifestController";
+
+const ELECTION_SCOREBOARD = "_kairo_election_iid";
 
 enum InitPhase {
+    Bootstrap,
+    Election,
     Discovery,
     Registration,
+    ApiRegister,
     Completed,
     Disposed,
 }
 
+type ElectionCandidate = {
+    readonly version: SemVer;
+    readonly instanceId: string;
+};
+
+type SessionKairoEntry = {
+    readonly version: SemVer;
+    readonly origin: "explicit" | "latest";
+};
+
 export class KairoInitializer implements Disposable {
     private subscription?: Disposable;
-    private phase = InitPhase.Discovery;
+    private phase = InitPhase.Bootstrap;
 
     private idRegistryProvider?: IdRegistryProvider;
     private kairoIdVerifier?: KairoIdVerifier;
@@ -29,16 +46,28 @@ export class KairoInitializer implements Disposable {
     private initListener?: KairoInitListener;
     private discoveryController?: DiscoveryController;
     private registrationController?: RegistrationController;
+    private apiManifestController?: ApiManifestController;
+
+    private readonly BOOTSTRAP_TIMEOUT_TICKS = 5;
+    private sessionPayload: string | null = null;
+
+    private readonly ELECTION_TIMEOUT_TICKS = 10;
+    private electionInstanceId?: string;
+    private pendingElectionCandidates: ElectionCandidate[] = [];
 
     private readonly DISCOVERY_RESPONSE_TIMEOUT_TICKS = 10;
     private pendingDiscoveryResponses?: string[] = [];
 
     private readonly REGISTRATION_RESPONSE_TIMEOUT_TICKS = 10;
+    private readonly API_REGISTER_TIMEOUT_TICKS = 10;
+
     constructor(
         private readonly runtime: KairoRuntime,
         random: Random,
         registryIndex: KairoRegistryIndex,
-        private readonly onCompleted?: () => void,
+        private readonly ownVersion: SemVer,
+        private readonly onCompleted?: (sessionPayload: string | null) => void,
+        private readonly onElectionLost?: () => void,
         private readonly onDisposed?: () => void,
     ) {
         this.idRegistryProvider = new IdRegistryProvider(random);
@@ -49,10 +78,14 @@ export class KairoInitializer implements Disposable {
             registryIndex,
             this.kairoRegistryVerifier,
         );
+        this.apiManifestController = new ApiManifestController(registryIndex);
 
         this.initListener = new KairoInitListener({
+            [KairoInitEventId.SessionResponse]: this.handleSessionResponse,
+            [KairoInitEventId.ElectionAnnounce]: this.handleElectionAnnounce,
             [KairoInitEventId.DiscoveryResponse]: this.handleDiscoveryResponse,
             [KairoInitEventId.RegistrationResponse]: this.handleRegistrationResponse,
+            [KairoInitEventId.ApiManifest]: this.handleApiManifest,
         });
     }
 
@@ -62,6 +95,152 @@ export class KairoInitializer implements Disposable {
     }
 
     onWorldLoad(): void {
+        this.runtime.send(KairoInitEventId.SessionRequest, "");
+
+        this.runtime.waitTicks(this.BOOTSTRAP_TIMEOUT_TICKS).then(() => {
+            this.assertNotDisposed();
+            if (this.phase !== InitPhase.Bootstrap) {
+                throw new KairoInitError(KairoInitErrorReason.InvalidPhase);
+            }
+            this.phase = InitPhase.Election;
+            this.startElection();
+        });
+    }
+
+    // ── Election ──────────────────────────────────────────────────
+
+    private startElection(): void {
+        // Create election scoreboard (may already exist from a previous crashed session)
+        if (!this.runtime.hasRegistry(ELECTION_SCOREBOARD)) {
+            this.runtime.addRegistry(ELECTION_SCOREBOARD, "");
+        }
+
+        // Generate a unique instanceId
+        const registry = this.runtime.getRegistry(ELECTION_SCOREBOARD);
+        let instanceId: string;
+        do {
+            instanceId = this.generateRandomHex();
+        } while (registry.has(instanceId));
+        registry.register(instanceId);
+        this.electionInstanceId = instanceId;
+
+        const ownVerStr = SemVerUtils.format(this.ownVersion);
+        console.log(`[kairo] Election started: own=${ownVerStr} instanceId=${instanceId}`);
+
+        // Broadcast candidacy
+        const msg = JSON.stringify(this.encodeAnnounce(this.ownVersion, instanceId));
+        this.runtime.send(KairoInitEventId.ElectionAnnounce, msg);
+
+        this.runtime.waitTicks(this.ELECTION_TIMEOUT_TICKS).then(() => {
+            this.assertNotDisposed();
+            if (this.phase !== InitPhase.Election) {
+                throw new KairoInitError(KairoInitErrorReason.InvalidPhase);
+            }
+
+            // Clean up election scoreboard
+            try { this.runtime.removeRegistry(ELECTION_SCOREBOARD); } catch {}
+
+            // If no announces received at all (edge case), self is the only candidate
+            const candidates = this.pendingElectionCandidates.length > 0
+                ? this.pendingElectionCandidates
+                : [{ version: this.ownVersion, instanceId: this.electionInstanceId! }];
+
+            const sessionKairo = this.parseSessionKairoEntry(this.sessionPayload);
+            const winner = this.selectWinner(candidates, sessionKairo);
+            const isWinner = winner.instanceId === this.electionInstanceId;
+
+            console.log(
+                `[kairo] Election result: ${isWinner ? "WINNER" : "LOSER"} | ` +
+                `winner=${SemVerUtils.format(winner.version)} id=${winner.instanceId} | ` +
+                `candidates(${candidates.length})=[${candidates.map(c => `${SemVerUtils.format(c.version)}:${c.instanceId}`).join(", ")}]`,
+            );
+
+            if (isWinner) {
+                this.phase = InitPhase.Discovery;
+                this.startDiscovery();
+            } else {
+                // Lost election — abort host initialization, guest side continues
+                this.onElectionLost?.();
+                this.dispose();
+            }
+        });
+    }
+
+    private encodeAnnounce(version: SemVer, instanceId: string): object {
+        return {
+            v: {
+                ma: version.major,
+                mi: version.minor,
+                p: version.patch,
+                ...(version.prerelease !== undefined ? { pre: version.prerelease } : {}),
+            },
+            id: instanceId,
+        };
+    }
+
+    private parseElectionAnnounce(message: string): ElectionCandidate | null {
+        try {
+            const data = JSON.parse(message) as { v: { ma: number; mi: number; p: number; pre?: string }; id: string };
+            if (typeof data.id !== "string" || typeof data.v?.ma !== "number") return null;
+            return {
+                version: {
+                    major: data.v.ma,
+                    minor: data.v.mi,
+                    patch: data.v.p,
+                    ...(data.v.pre !== undefined ? { prerelease: data.v.pre } : {}),
+                },
+                instanceId: data.id,
+            };
+        } catch {
+            return null;
+        }
+    }
+
+    private parseSessionKairoEntry(payload: string | null): SessionKairoEntry | undefined {
+        if (!payload) return undefined;
+        try {
+            const parsed = JSON.parse(payload) as Record<string, { v: { ma: number; mi: number; p: number; pre?: string }; o: string }>;
+            const entry = parsed["kairo"];
+            if (!entry) return undefined;
+            return {
+                version: {
+                    major: entry.v.ma,
+                    minor: entry.v.mi,
+                    patch: entry.v.p,
+                    ...(entry.v.pre !== undefined ? { prerelease: entry.v.pre } : {}),
+                },
+                origin: entry.o === "explicit" ? "explicit" : "latest",
+            };
+        } catch {
+            return undefined;
+        }
+    }
+
+    private selectWinner(candidates: ElectionCandidate[], sessionKairo?: SessionKairoEntry): ElectionCandidate {
+        // Priority 1: explicit session preference
+        if (sessionKairo?.origin === "explicit") {
+            const preferred = candidates.find(c => SemVerUtils.equals(c.version, sessionKairo.version));
+            if (preferred) return preferred;
+        }
+        // Priority 2: latest (stable preferred, fallback to prerelease, tiebreak by instanceId)
+        const stable = candidates.filter(c => !SemVerUtils.isPrerelease(c.version));
+        const pool = stable.length > 0 ? stable : candidates;
+        return pool.reduce((best, cur) => {
+            const cmp = SemVerUtils.compare(cur.version, best.version);
+            if (cmp > 0) return cur;
+            if (cmp < 0) return best;
+            return cur.instanceId < best.instanceId ? cur : best;
+        });
+    }
+
+    private generateRandomHex(): string {
+        const n = Math.floor(Math.random() * 0xFFFFFFFF);
+        return n.toString(16).padStart(8, "0");
+    }
+
+    // ── Discovery ─────────────────────────────────────────────────
+
+    private startDiscovery(): void {
         const registryId = this.idRegistryProvider!.provideRegistry(this.runtime);
         this.discoveryController!.handleOnWorldLoad(registryId, { runtime: this.runtime });
 
@@ -97,11 +276,22 @@ export class KairoInitializer implements Disposable {
                 throw new KairoInitError(KairoInitErrorReason.InvalidPhase);
             }
 
-            this.phase = InitPhase.Completed;
+            this.phase = InitPhase.ApiRegister;
+            this.onRegistrationComplete();
+        });
+    }
 
-            // Initialization is complete; activation can begin from the onCompleted callback.
+    private onRegistrationComplete(): void {
+        this.runtime.waitTicks(this.API_REGISTER_TIMEOUT_TICKS).then(() => {
+            this.assertNotDisposed();
+
+            if (this.phase !== InitPhase.ApiRegister) {
+                throw new KairoInitError(KairoInitErrorReason.InvalidPhase);
+            }
+
+            this.phase = InitPhase.Completed;
             this.dispose();
-            this.onCompleted?.();
+            this.onCompleted?.(this.sessionPayload);
         });
     }
 
@@ -127,8 +317,26 @@ export class KairoInitializer implements Disposable {
         this.initListener = undefined;
         this.discoveryController = undefined;
         this.registrationController = undefined;
+        this.apiManifestController = undefined;
         this.pendingDiscoveryResponses = undefined;
+        this.pendingElectionCandidates = [];
     }
+
+    // ── Event handlers ────────────────────────────────────────────
+
+    private handleSessionResponse = (message: string): void => {
+        if (this.phase !== InitPhase.Bootstrap) return;
+        this.sessionPayload = message || null;
+    };
+
+    private handleElectionAnnounce = (message: string): void => {
+        if (this.phase !== InitPhase.Election) return;
+        const candidate = this.parseElectionAnnounce(message);
+        if (candidate) {
+            this.pendingElectionCandidates.push(candidate);
+            console.log(`[kairo] Election: candidate received version=${SemVerUtils.format(candidate.version)} instanceId=${candidate.instanceId}`);
+        }
+    };
 
     private handleDiscoveryResponse = (message: string): void => {
         this.assertPhase(InitPhase.Discovery);
@@ -155,6 +363,11 @@ export class KairoInitializer implements Disposable {
             this.dispose();
             throw error;
         }
+    };
+
+    private handleApiManifest = (message: string): void => {
+        if (this.phase !== InitPhase.ApiRegister && this.phase !== InitPhase.Registration) return;
+        this.apiManifestController!.handleApiManifest(message);
     };
 
     private assertNotDisposed(): void {

@@ -1,6 +1,13 @@
 import type { SemVer } from "@kairo-js/properties";
 import type { KairoRegistry } from "@kairo-js/router";
 import { SemVerUtils } from "@kairo-js/utils";
+import type { ApiManifest } from "./init/api/ApiManifestSchema";
+import type { HandoffRegistryEntry } from "./handoff/HandoffPayload";
+
+export type KairoRegistryWithManifest = {
+    readonly registry: KairoRegistry;
+    readonly manifest: ApiManifest;
+};
 
 export interface KairoRegistryQueryable {
     hasAddonVersion(addonId: string, version: SemVer): boolean;
@@ -9,11 +16,12 @@ export interface KairoRegistryQueryable {
     getLatestAddonVersion(addonId: string): KairoRegistry | undefined;
     getDependents(addonId: string): readonly KairoRegistry[];
     getAll(): readonly KairoRegistry[];
+    getAllWithManifests(): readonly KairoRegistryWithManifest[];
     createRegistryKey(registry: KairoRegistry): string;
 }
 
 export class KairoRegistryIndex implements KairoRegistryQueryable {
-    private readonly byKey = new Map<string, KairoRegistry>();
+    private readonly byKey = new Map<string, KairoRegistryWithManifest>();
     private readonly byAddonId = new Map<string, KairoRegistry[]>();
     private readonly dependents = new Map<string, Set<string>>();
 
@@ -24,9 +32,66 @@ export class KairoRegistryIndex implements KairoRegistryQueryable {
             throw new Error(`Registry already exists: ${key}`);
         }
 
-        this.byKey.set(key, registry);
+        this.byKey.set(key, { registry, manifest: { apis: [], hooks: [], eventSubscriptions: [] } });
         this.indexByAddonId(registry);
         this.indexDependents(registry);
+    }
+
+    loadFromHandoff(entries: readonly HandoffRegistryEntry[]): void {
+        this.byKey.clear();
+        this.byAddonId.clear();
+        this.dependents.clear();
+
+        for (const entry of entries) {
+            const registry: KairoRegistry = {
+                kairoId: entry.kairoId,
+                addonId: entry.addonId,
+                version: {
+                    major: entry.version.ma,
+                    minor: entry.version.mi,
+                    patch: entry.version.p,
+                    ...(entry.version.pre !== undefined ? { prerelease: entry.version.pre } : {}),
+                },
+                name: entry.name,
+                description: entry.description,
+                metadata: {
+                    authors: [...entry.metadata.authors],
+                    url: entry.metadata.url,
+                    license: entry.metadata.license,
+                },
+                dependencies: { ...entry.dependencies },
+                optionalDependencies: { ...entry.optionalDependencies },
+                tags: [...entry.tags],
+            };
+            const manifest: ApiManifest = {
+                apis: entry.manifest.apis.map((a) => ({ name: a.name })),
+                hooks: entry.manifest.hooks.map((h) => ({
+                    targetAddonId: h.targetAddonId,
+                    apiName: h.apiName,
+                    priority: h.priority,
+                    phases: h.phases as Array<"before" | "after">,
+                    declarationSequence: h.declarationSequence,
+                    hasRollback: h.hasRollback,
+                })),
+                eventSubscriptions: entry.manifest.eventSubscriptions.map((s) => ({
+                    emitterAddonId: s.emitterAddonId,
+                    eventName: s.eventName,
+                })),
+            };
+            const key = this.createRegistryKey(registry);
+            this.byKey.set(key, { registry, manifest });
+            this.indexByAddonId(registry);
+            this.indexDependents(registry);
+        }
+    }
+
+    setManifest(kairoId: string, manifest: ApiManifest): void {
+        for (const [key, entry] of this.byKey) {
+            if (entry.registry.kairoId === kairoId) {
+                this.byKey.set(key, { registry: entry.registry, manifest });
+                return;
+            }
+        }
     }
 
     hasAddonVersion(addonId: string, version: SemVer): boolean {
@@ -34,7 +99,7 @@ export class KairoRegistryIndex implements KairoRegistryQueryable {
     }
 
     getAddonVersion(addonId: string, version: SemVer): KairoRegistry | undefined {
-        return this.byKey.get(this.createKey(addonId, version));
+        return this.byKey.get(this.createKey(addonId, version))?.registry;
     }
 
     getAddonVersions(addonId: string): readonly KairoRegistry[] {
@@ -61,6 +126,10 @@ export class KairoRegistryIndex implements KairoRegistryQueryable {
     }
 
     getAll(): readonly KairoRegistry[] {
+        return [...this.byKey.values()].map((v) => v.registry);
+    }
+
+    getAllWithManifests(): readonly KairoRegistryWithManifest[] {
         return [...this.byKey.values()];
     }
 

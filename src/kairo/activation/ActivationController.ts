@@ -2,6 +2,7 @@ import type { KairoRegistry } from "@kairo-js/router";
 import { SemVerUtils } from "@kairo-js/utils";
 import type { KairoRuntime } from "../../minecraft/KairoRuntime";
 import type { KairoRegistryQueryable } from "../KairoRegistryIndex";
+import type { HandoffPayload } from "../handoff/HandoffPayload";
 import { ActivationExecutor } from "./ActivationExecutor";
 import { ActivationService } from "./ActivationService";
 import { DeactivationExecutor } from "./DeactivationExecutor";
@@ -14,11 +15,14 @@ import type { ActivationPlan } from "./types/plan";
 import {
     AddonState,
     InactiveReasonCode,
+    UnresolvedReasonCode,
     type AddonDependencySpec,
     type AddonRuntimeState,
+    type InactiveReasons,
+    type UnresolvedReasons,
     type KairoId,
 } from "./types/state";
-import type { KairoWorldState } from "./types/world";
+import type { KairoWorldState, PreviousSessionStore } from "./types/world";
 
 export type DisablePreview = {
     readonly cascadeVictims: readonly KairoId[];
@@ -51,6 +55,8 @@ export class ActivationController {
     constructor(
         private readonly runtime: KairoRuntime,
         private readonly registryIndex: KairoRegistryQueryable,
+        private readonly onAddonDeactivated?: (kairoId: KairoId) => void,
+        private readonly onSessionChanged?: (session: PreviousSessionStore) => void,
     ) {
         this.executor = new ActivationExecutor(runtime);
         const optionalActivator = new OptionalActivator(this.executor);
@@ -70,8 +76,8 @@ export class ActivationController {
 
     setup(): void {}
 
-    startupResolve(): ActivationPlan {
-        this._world = this.buildWorldState();
+    startupResolve(initialSession?: PreviousSessionStore): ActivationPlan {
+        this._world = this.buildWorldState(initialSession);
         this._world.cachedDeclaredReverseGraph = this.buildReverseGraph(this._world);
         const scope = new Set<KairoId>();
         for (const kairoId of this._world.runtimes.keys()) {
@@ -87,6 +93,84 @@ export class ActivationController {
 
     async startupActivate(plan: ActivationPlan): Promise<void> {
         await this.activationService.activate(this.world, plan);
+    }
+
+    restoreFromHandoff(payload: HandoffPayload): void {
+        const registries = new Map<KairoId, KairoRegistry>();
+        const runtimes = new Map<KairoId, AddonRuntimeState>();
+        const addonIdIndex = new Map<string, Set<KairoId>>();
+
+        for (const entry of payload.registries) {
+            const registry: KairoRegistry = {
+                kairoId: entry.kairoId,
+                addonId: entry.addonId,
+                version: {
+                    major: entry.version.ma,
+                    minor: entry.version.mi,
+                    patch: entry.version.p,
+                    ...(entry.version.pre !== undefined ? { prerelease: entry.version.pre } : {}),
+                },
+                name: entry.name,
+                description: entry.description,
+                metadata: {
+                    authors: [...entry.metadata.authors],
+                    url: entry.metadata.url,
+                    license: entry.metadata.license,
+                },
+                dependencies: { ...entry.dependencies },
+                optionalDependencies: { ...entry.optionalDependencies },
+                tags: [...entry.tags],
+            };
+            registries.set(entry.kairoId, registry);
+
+            let group = addonIdIndex.get(entry.addonId);
+            if (!group) { group = new Set(); addonIdIndex.set(entry.addonId, group); }
+            group.add(entry.kairoId);
+        }
+
+        for (const rt of payload.runtimes) {
+            const state =
+                rt.state === "ACTIVE" ? AddonState.ACTIVE
+                : rt.state === "INACTIVE" ? AddonState.INACTIVE
+                : AddonState.UNRESOLVED;
+
+            const inactiveReasons: InactiveReasons = new Map();
+            for (const r of rt.inactiveReasons) {
+                inactiveReasons.set(r.code as InactiveReasonCode, {
+                    code: r.code as InactiveReasonCode,
+                    message: r.message,
+                    ...(r.related ? { related: r.related } : {}),
+                });
+            }
+            const unresolvedReasons: UnresolvedReasons = new Map();
+            for (const r of rt.unresolvedReasons) {
+                unresolvedReasons.set(r.code as UnresolvedReasonCode, {
+                    code: r.code as UnresolvedReasonCode,
+                    message: r.message,
+                    ...(r.related ? { related: r.related } : {}),
+                });
+            }
+
+            runtimes.set(rt.kairoId, { kairoId: rt.kairoId, state, inactiveReasons, unresolvedReasons });
+        }
+
+        const previousSession: PreviousSessionStore = new Map();
+        for (const [addonId, entry] of Object.entries(payload.previousSession)) {
+            previousSession.set(addonId, {
+                version: {
+                    major: entry.v.ma,
+                    minor: entry.v.mi,
+                    patch: entry.v.p,
+                    ...(entry.v.pre !== undefined ? { prerelease: entry.v.pre } : {}),
+                },
+                origin: entry.o,
+                ...(entry.d ? { disabled: true } : {}),
+            });
+        }
+
+        this._world = { registries, runtimes, addonIdIndex, previousSession };
+        this._world.cachedDeclaredReverseGraph = this.buildReverseGraph(this._world);
+        this._activationOrder = payload.activationOrder;
     }
 
     // ── Preview methods ──────────────────────────────────────────
@@ -198,6 +282,7 @@ export class ActivationController {
                     message: `Dependency ${kairoId} was manually deactivated`,
                     related: [kairoId],
                 });
+                this.onAddonDeactivated?.(victimId);
             }
         }
 
@@ -208,6 +293,7 @@ export class ActivationController {
                 code: InactiveReasonCode.MANUALLY_DEACTIVATED,
                 message: "Manually deactivated",
             });
+            this.onAddonDeactivated?.(kairoId);
             const registry = world.registries.get(kairoId);
             if (registry) {
                 world.previousSession.set(registry.addonId, {
@@ -215,6 +301,7 @@ export class ActivationController {
                     origin: "explicit",
                     disabled: true,
                 });
+                this.onSessionChanged?.(world.previousSession);
             }
         }
     }
@@ -235,6 +322,7 @@ export class ActivationController {
         const registry = world.registries.get(kairoId);
         if (registry) {
             world.previousSession.set(registry.addonId, { version: registry.version, origin });
+            this.onSessionChanged?.(world.previousSession);
         }
 
         // Deactivate displaced versions before activating the plan
@@ -249,9 +337,11 @@ export class ActivationController {
                     message: `Dependency ${oldId} was switched`,
                     related: [oldId],
                 });
+                this.onAddonDeactivated?.(victimId);
             }
             // Still running in Minecraft despite in-memory INACTIVE state set by ConflictResolver
             await this.deactivationExecutor.deactivate(oldId);
+            this.onAddonDeactivated?.(oldId);
         }
 
         await this.activationService.activate(world, plan);
@@ -271,6 +361,7 @@ export class ActivationController {
                 message: `Version switch on ${world.registries.get(oldKairoId)?.addonId}`,
                 related: [oldKairoId],
             });
+            this.onAddonDeactivated?.(victimId);
         }
 
         // Deactivate old version
@@ -287,6 +378,7 @@ export class ActivationController {
                 related: [newKairoId],
             });
         }
+        this.onAddonDeactivated?.(oldKairoId);
 
         // Update session before previewEnable so ConflictResolver picks the new version
         const newRegistry = world.registries.get(newKairoId);
@@ -295,11 +387,24 @@ export class ActivationController {
                 version: newRegistry.version,
                 origin: "explicit",
             });
+            this.onSessionChanged?.(world.previousSession);
         }
 
         // Activate new version
         const { plan } = this.previewEnable(newKairoId);
         await this.activationService.activate(world, plan);
+    }
+
+    // ── kairo-specific ───────────────────────────────────────────
+
+    saveKairoVersionPreference(kairoId: KairoId, origin: "latest" | "explicit"): void {
+        const registry = this.world.registries.get(kairoId);
+        if (!registry) return;
+        this.world.previousSession.set(registry.addonId, {
+            version: registry.version,
+            origin,
+        });
+        this.onSessionChanged?.(this.world.previousSession);
     }
 
     // ── Private helpers ──────────────────────────────────────────
@@ -343,7 +448,7 @@ export class ActivationController {
         return graph;
     }
 
-    private buildWorldState(): KairoWorldState {
+    private buildWorldState(initialSession?: PreviousSessionStore): KairoWorldState {
         const registries = new Map<KairoId, KairoRegistry>();
         const runtimes = new Map<KairoId, AddonRuntimeState>();
         const addonIdIndex = new Map<string, Set<KairoId>>();
@@ -363,6 +468,6 @@ export class ActivationController {
             group.add(kairoId);
         }
 
-        return { registries, runtimes, addonIdIndex, previousSession: new Map() };
+        return { registries, runtimes, addonIdIndex, previousSession: initialSession ?? new Map() };
     }
 }

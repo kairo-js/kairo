@@ -44,6 +44,7 @@ export class KairoRuntime {
         id: string;
         displayName: string;
         has(displayName: string): boolean;
+        register(participantName: string): void;
     } {
         if (!this.hasRegistry(id)) {
             throw new Error(`Objective with id "${id}" does not exist.`);
@@ -54,6 +55,9 @@ export class KairoRuntime {
             displayName: objective.displayName,
             has(displayName: string): boolean {
                 return objective.hasParticipant(displayName);
+            },
+            register(participantName: string): void {
+                objective.setScore(participantName, 0);
             },
         };
     }

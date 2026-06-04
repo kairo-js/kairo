@@ -31,10 +31,8 @@ export class RegistrationController {
     }
 
     handleRegistrationResponse(message: string, deps: { runtime: KairoRuntime }): void {
-        const kairoRegistry = this.registrationManager.resolveKairoRegistry(
-            message,
-            deps.runtime.currentTick(),
-        );
+        const kairoRegistry =
+            this.registrationManager.resolveRegistration(message, deps.runtime.currentTick());
 
         const result = this.kairoRegistryVerifier.verify(kairoRegistry);
         if (!result.success) {

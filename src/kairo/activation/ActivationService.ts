@@ -1,6 +1,7 @@
 import type { ActivationExecutor } from "./ActivationExecutor";
 import type { OptionalActivator } from "./OptionalActivator";
 import { applyActivationOutcome } from "./helpers/ApplyOutcome";
+import { setActive } from "./helpers/RuntimeTransition";
 import type { ActivationContext, ActivationSession } from "./types/context";
 import type { ActivationPlan } from "./types/plan";
 import { AddonState, type KairoId } from "./types/state";
@@ -25,6 +26,12 @@ export class ActivationService {
 
             // Optional activation may have already activated this addon
             if (world.runtimes.get(kairoId)?.state === AddonState.ACTIVE) continue;
+
+            // Set ACTIVE optimistically before sending the request so that
+            // addonActivate handlers in the guest can already call APIs targeting this addon.
+            // applyActivationOutcome will roll back to INACTIVE if activation fails.
+            const rt = world.runtimes.get(kairoId);
+            if (rt) setActive(rt);
 
             const outcome = await this.executor.activate(kairoId);
 
