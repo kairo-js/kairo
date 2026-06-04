@@ -7,8 +7,9 @@ import {
     CustomCommandParamType,
     CustomCommandStatus,
     system,
+    world,
 } from "@minecraft/server";
-import type { CustomCommandOrigin, Player } from "@minecraft/server";
+import type { Player } from "@minecraft/server";
 import { AddonState } from "./activation/types/state";
 import { KairoRuntime } from "../minecraft/KairoRuntime";
 import { ActivationController } from "./activation/ActivationController";
@@ -79,6 +80,18 @@ class Kairo {
             this.onInitComplete,
             this.onElectionLost,
             () => {},
+            (conflicts) => {
+                const names = conflicts.map(c => `§e${c.commandName}§c`).join(", ");
+                const msg = `§c[Kairo] §lコマンド互換性エラー:§r §c古いバージョンのアドオンをアンインストールしてください。\n影響コマンド: ${names}`;
+
+                // ホストプレイヤーのスポーンを待って送信
+                const sub = world.afterEvents.playerSpawn.subscribe((ev) => {
+                    if (!ev.initialSpawn) return;
+                    if (ev.player.commandPermissionLevel < CommandPermissionLevel.Host) return;
+                    ev.player.sendMessage(msg);
+                    world.afterEvents.playerSpawn.unsubscribe(sub);
+                });
+            },
         );
         this.router.waitForWorldLoad().then(() => {
             initializer.setup();
@@ -86,14 +99,14 @@ class Kairo {
         });
 
         this.router.beforeEvents.startup.subscribe((ev) => {
-            ev.customCommandRegistry.registerEnum("kairo:addons_subcommand", [
+            ev.commands.registerEnum("kairo:addons_subcommand", [
                 "list",
                 "open",
                 "enable",
                 "disable",
                 "status",
             ]);
-            ev.customCommandRegistry.registerCommand(
+            ev.commands.register(
                 {
                     name: "kairo:addons",
                     description: "Manages Kairo addons",
@@ -107,15 +120,14 @@ class Kairo {
                         { name: "version", type: CustomCommandParamType.String },
                     ],
                 },
-                (origin: CustomCommandOrigin, subcommand: string, addonId?: string, version?: string) => {
-                    const player = origin.sourceEntity as Player;
+                (player: Player | undefined, subcommand: string, addonId?: string, version?: string) => {
                     if (subcommand === "list") {
                         system.run(() => {
-                            this.commandList(player);
+                            if (player) this.commandList(player);
                         });
                     } else if (subcommand === "open") {
                         system.run(() => {
-                            this.ui?.open(player);
+                            if (player) this.ui?.open(player);
                         });
                     } else if (subcommand === "enable" && addonId) {
                         const _player = player;
@@ -135,7 +147,7 @@ class Kairo {
                         });
                     } else if (subcommand === "status" && addonId) {
                         system.run(() => {
-                            this.commandStatus(player, addonId);
+                            if (player) this.commandStatus(player, addonId);
                         });
                     }
                     return { status: CustomCommandStatus.Success };

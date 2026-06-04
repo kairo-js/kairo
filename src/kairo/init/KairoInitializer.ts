@@ -69,6 +69,7 @@ export class KairoInitializer implements Disposable {
         private readonly onCompleted?: (sessionPayload: string | null) => void,
         private readonly onElectionLost?: () => void,
         private readonly onDisposed?: () => void,
+        private readonly onCommandConflict?: (conflicts: import("./api/ApiManifestController").CommandConflict[]) => void,
     ) {
         this.idRegistryProvider = new IdRegistryProvider(random);
         this.kairoIdVerifier = new KairoIdVerifier();
@@ -78,7 +79,7 @@ export class KairoInitializer implements Disposable {
             registryIndex,
             this.kairoRegistryVerifier,
         );
-        this.apiManifestController = new ApiManifestController(registryIndex);
+        this.apiManifestController = new ApiManifestController(registryIndex, this.onCommandConflict);
 
         this.initListener = new KairoInitListener({
             [KairoInitEventId.SessionResponse]: this.handleSessionResponse,
