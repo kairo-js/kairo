@@ -77,6 +77,11 @@ export class KairoRegistryIndex implements KairoRegistryQueryable {
                     emitterAddonId: s.emitterAddonId,
                     eventName: s.eventName,
                 })),
+                commands: entry.manifest.commands.map((c) => ({
+                    name: c.name,
+                    mandatoryParameters: c.mandatoryParameters.map((p) => ({ name: p.name, type: p.type })),
+                    optionalParameters: c.optionalParameters.map((p) => ({ name: p.name, type: p.type })),
+                })),
             };
             const key = this.createRegistryKey(registry);
             this.byKey.set(key, { registry, manifest });

@@ -34,7 +34,13 @@ export class AddonDetailScreen {
         const kairoIds = [...(world.addonIdIndex.get(addonId) ?? [])];
 
         const activeId = kairoIds.find(id => world.runtimes.get(id)?.state === AddonState.ACTIVE);
-        const selectableIds = kairoIds.filter(id => world.runtimes.get(id)?.state !== AddonState.UNRESOLVED);
+        const selectableIds = kairoIds
+            .filter(id => world.runtimes.get(id)?.state !== AddonState.UNRESOLVED)
+            .sort((a, b) => {
+                const ra = world.registries.get(a)!;
+                const rb = world.registries.get(b)!;
+                return SemVerUtils.compare(rb.version, ra.version);
+            });
 
         const displayId = activeId ?? this.resolveLatest(addonId, world, selectableIds) ?? kairoIds[0]!;
         const displayRegistry = world.registries.get(displayId)!;

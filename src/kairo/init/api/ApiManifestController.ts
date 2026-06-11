@@ -11,6 +11,13 @@ export class ApiManifestController {
         private readonly onCommandConflict?: (conflicts: CommandConflict[]) => void,
     ) {}
 
+    processManifest(kairoId: string, manifest: ApiManifest): void {
+        this.kairoRegistryIndex.setManifest(kairoId, manifest);
+        if (manifest.commands && manifest.commands.length > 0) {
+            this.checkCommandCompatibility(kairoId, manifest.commands);
+        }
+    }
+
     handleApiManifest(message: string): void {
         const parsed = safeJsonParse(message, () => new Error("api_manifest: JSON parse failed"));
 

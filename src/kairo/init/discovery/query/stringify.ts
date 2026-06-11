@@ -1,5 +1,4 @@
-import fastJson from "fast-json-stringify";
-import { type DiscoveryQuery, DiscoveryQuerySchema } from "./schema";
+import type { DiscoveryQuery } from "./schema";
 
-export const stringifyDiscoveryQuery: (query: DiscoveryQuery) => string =
-    fastJson(DiscoveryQuerySchema);
+export const stringifyDiscoveryQuery = (query: DiscoveryQuery): string =>
+    JSON.stringify(query);

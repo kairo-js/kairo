@@ -2,6 +2,7 @@ import { InputPermissionCategory, type Player } from "@minecraft/server";
 import { SemVerUtils } from "@kairo-js/utils";
 import type { ActivationController } from "../activation/ActivationController";
 import { AddonState } from "../activation/types/state";
+import type { KairoWorldState } from "../activation/types/world";
 import { AddonListScreen } from "./screens/AddonListScreen";
 import { AddonDetailScreen } from "./screens/AddonDetailScreen";
 import { AddonUnresolvedScreen } from "./screens/AddonUnresolvedScreen";
@@ -16,10 +17,13 @@ export class KairoUI {
     private readonly addonUnresolved = new AddonUnresolvedScreen();
     private readonly confirm = new ConfirmScreen();
 
-    constructor(private readonly controller: ActivationController) {}
+    constructor(
+        private readonly controller: ActivationController,
+        private readonly onKairoLiveSwitch?: (targetKairoId: string, player: Player) => boolean,
+    ) {}
 
     async open(player: Player): Promise<void> {
-        const world = this.controller.world;
+        const world: KairoWorldState = this.controller.world;
 
         player.inputPermissions.setPermissionCategory(InputPermissionCategory.Camera, false);
         try {
@@ -73,11 +77,16 @@ export class KairoUI {
         );
         if (currentActiveId === kairoId) return "done";
 
-        this.controller.saveKairoVersionPreference(kairoId, origin);
+        // Try live switch via handoff
+        if (this.onKairoLiveSwitch?.(kairoId, player)) {
+            return "done";
+        }
 
+        // Fallback: save preference for next reload
+        this.controller.saveKairoVersionPreference(kairoId, origin);
         const ver = SemVerUtils.format(reg.version);
         const verLabel = origin === "latest" ? `Latest version (${ver})` : ver;
-        player.sendMessage(`§b[Kairo] §rKairo §a${verLabel}§r will activate on next world reload`);
+        player.sendMessage(`§e[Kairo] §rKairo §a${verLabel}§r is not available for live switch. Will activate on next world reload.`);
         player.playSound("random.orb");
         return "done";
     }

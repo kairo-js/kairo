@@ -29,6 +29,17 @@ export class StandbyRegistry {
         return best;
     }
 
+    findByKairoId(kairoId: string): StandbyEntry | undefined {
+        return this.entries.get(kairoId);
+    }
+
+    findByVersionString(versionStr: string): StandbyEntry | undefined {
+        for (const entry of this.entries.values()) {
+            if (SemVerUtils.format(entry.version) === versionStr) return entry;
+        }
+        return undefined;
+    }
+
     getAll(): readonly StandbyEntry[] {
         return [...this.entries.values()];
     }

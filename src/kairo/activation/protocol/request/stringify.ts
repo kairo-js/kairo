@@ -1,5 +1,4 @@
-import fastJson from "fast-json-stringify";
-import { type ActivationRequest, ActivationRequestSchema } from "./schema";
+import type { ActivationRequest } from "./schema";
 
-export const stringifyActivationRequest: (query: ActivationRequest) => string =
-    fastJson(ActivationRequestSchema);
+export const stringifyActivationRequest = (query: ActivationRequest): string =>
+    JSON.stringify(query);

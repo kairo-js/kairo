@@ -1,10 +1,11 @@
-import { type Disposable, KairoRouter, router } from "@kairo-js/router";
+import { type Disposable, type KairoCommandOrigin, KairoRouter, router } from "@kairo-js/router";
 import { parseSession, saveSession } from "./session/SessionStorage";
 import { SeedRandom, SemVerUtils } from "@kairo-js/utils";
 import type { AddonProperties } from "@kairo-js/properties";
 import {
     CommandPermissionLevel,
     CustomCommandParamType,
+    CustomCommandSource,
     CustomCommandStatus,
     system,
     world,
@@ -25,8 +26,14 @@ import type { HandoffPayload } from "./handoff/HandoffPayload";
 import { HandoffOrchestrator } from "./handoff/HandoffOrchestrator";
 import { HandoffReceiver } from "./handoff/HandoffReceiver";
 import { StandbyRegistry } from "./handoff/StandbyRegistry";
+import { ApiManifestController } from "./init/api/ApiManifestController";
+
+// Set to false in test/standby packs so they don't conflict with the primary pack's command registration
+const REGISTER_COMMANDS = true;
 
 class Kairo {
+    private static readonly UI_OPEN_EVENT = "kairo:ui-open";
+
     private runtime?: KairoRuntime;
     private readonly registryIndex = new KairoRegistryIndex();
     private activationController?: ActivationController;
@@ -80,25 +87,14 @@ class Kairo {
             this.onInitComplete,
             this.onElectionLost,
             () => {},
-            (conflicts) => {
-                const names = conflicts.map(c => `§e${c.commandName}§c`).join(", ");
-                const msg = `§c[Kairo] §lコマンド互換性エラー:§r §c古いバージョンのアドオンをアンインストールしてください。\n影響コマンド: ${names}`;
-
-                // ホストプレイヤーのスポーンを待って送信
-                const sub = world.afterEvents.playerSpawn.subscribe((ev) => {
-                    if (!ev.initialSpawn) return;
-                    if (ev.player.commandPermissionLevel < CommandPermissionLevel.Host) return;
-                    ev.player.sendMessage(msg);
-                    world.afterEvents.playerSpawn.unsubscribe(sub);
-                });
-            },
+            this.handleCommandConflict,
         );
         this.router.waitForWorldLoad().then(() => {
             initializer.setup();
             initializer.onWorldLoad();
         });
 
-        this.router.beforeEvents.startup.subscribe((ev) => {
+        if (REGISTER_COMMANDS) this.router.beforeEvents.startup.subscribe((ev) => {
             ev.commands.registerEnum("kairo:addons_subcommand", [
                 "list",
                 "open",
@@ -120,19 +116,34 @@ class Kairo {
                         { name: "version", type: CustomCommandParamType.String },
                     ],
                 },
-                (player: Player | undefined, subcommand: string, addonId?: string, version?: string) => {
+                (origin: KairoCommandOrigin, subcommand: string, addonId?: string, version?: string) => {
+                    const player = playerFromOrigin(origin);
                     if (subcommand === "list") {
                         system.run(() => {
                             if (player) this.commandList(player);
                         });
                     } else if (subcommand === "open") {
+                        const playerName = player?.name ?? "";
+                        console.log(`[kairo] open cmd handler: player=${playerName} ui=${!!this.ui} isHost=${this.isHost}`);
                         system.run(() => {
-                            if (player) this.ui?.open(player);
+                            if (this.ui && player) {
+                                console.log(`[kairo] open: opening UI directly`);
+                                void this.ui.open(player);
+                            } else if (playerName) {
+                                console.log(`[kairo] open: sending ScriptEvent ${Kairo.UI_OPEN_EVENT} to host`);
+                                this.runtime?.send(Kairo.UI_OPEN_EVENT, playerName);
+                            } else {
+                                console.warn(`[kairo] open: no player and no playerName`);
+                            }
                         });
                     } else if (subcommand === "enable" && addonId) {
+                        // Support "addonId@version" syntax when the optional version param is not received
+                        const at = !version ? addonId.lastIndexOf("@") : -1;
+                        const targetId = at > 0 ? addonId.slice(0, at) : addonId;
+                        const targetVersion = at > 0 ? addonId.slice(at + 1) : version;
                         const _player = player;
                         system.run(() => {
-                            void this.commandEnable(addonId, version, _player);
+                            void this.commandEnable(targetId, targetVersion, _player);
                         });
                     } else if (subcommand === "disable" && addonId) {
                         if (addonId === "kairo") {
@@ -289,7 +300,14 @@ class Kairo {
             origin = "latest";
         }
 
-        if (!newKairoId) return;
+        if (!newKairoId) {
+            if (versionStr) {
+                player?.sendMessage(`§c[Kairo] §rVersion §e${versionStr}§r of §e${addonId}§c not found.`);
+            } else {
+                player?.sendMessage(`§c[Kairo] §rNo activatable version of §e${addonId}§c found.`);
+            }
+            return;
+        }
 
         const currentActiveId = [...kairoIds].find(
             (id) => world.runtimes.get(id)?.state === AddonState.ACTIVE,
@@ -312,16 +330,7 @@ class Kairo {
 
         // Find the target standby entry
         let standbyEntry = versionStr
-            ? (() => {
-                const parts = versionStr.split(".");
-                if (parts.length < 3) return undefined;
-                const ma = Number(parts[0]);
-                const mi = Number(parts[1]);
-                const p = Number(parts[2]);
-                if (isNaN(ma) || isNaN(mi) || isNaN(p)) return undefined;
-                const version = { major: ma, minor: mi, patch: p };
-                return this.standbyRegistry.findByVersion(version);
-            })()
+            ? this.standbyRegistry.findByVersionString(versionStr)
             : this.standbyRegistry.findBest();
 
         if (standbyEntry) {
@@ -360,7 +369,12 @@ class Kairo {
                 origin = "latest";
             }
 
-            if (!targetKairoId) return;
+            if (!targetKairoId) {
+                if (versionStr) {
+                    player?.sendMessage(`§c[Kairo] §rKairo version §e${versionStr}§c not found.`);
+                }
+                return;
+            }
 
             this.activationController.saveKairoVersionPreference(targetKairoId, origin);
             const reg = world.registries.get(targetKairoId);
@@ -420,6 +434,48 @@ class Kairo {
 
         await this.activationController.executeDisable(activeId);
     }
+
+    private startUIOpenListener(): void {
+        console.log(`[kairo] startUIOpenListener: registering listener`);
+        this.runtime?.receive((id, playerName) => {
+            if (id !== Kairo.UI_OPEN_EVENT) return;
+            console.log(`[kairo] UI_OPEN_EVENT received: playerName=${playerName} ui=${!!this.ui}`);
+            if (!this.ui) {
+                console.warn(`[kairo] UI_OPEN_EVENT: ui is null, ignoring`);
+                return;
+            }
+            system.run(() => {
+                const players = world.getPlayers();
+                const p = players.find(pl => pl.name === playerName);
+                console.log(`[kairo] UI_OPEN_EVENT system.run: players=${players.length} found=${!!p}`);
+                if (p && this.ui) void this.ui.open(p);
+            });
+        });
+    }
+
+    private buildUI(activationController: ActivationController): KairoUI {
+        return new KairoUI(
+            activationController,
+            (targetKairoId, player) => {
+                const entry = this.standbyRegistry.findByKairoId(targetKairoId);
+                if (!entry) return false;
+                this.startVersionSwitch(targetKairoId, entry.version, player);
+                return true;
+            },
+        );
+    }
+
+    private readonly handleCommandConflict: ConstructorParameters<typeof ApiManifestController>[1] = (conflicts) => {
+        const names = conflicts.map(c => `§e${c.commandName}§c`).join(", ");
+        const msg = `§c[Kairo] §lコマンド互換性エラー:§r §c古いバージョンのアドオンをアンインストールしてください。\n影響コマンド: ${names}`;
+
+        const sub = world.afterEvents.playerSpawn.subscribe((ev) => {
+            if (!ev.initialSpawn) return;
+            if (ev.player.commandPermissionLevel < CommandPermissionLevel.Host) return;
+            ev.player.sendMessage(msg);
+            world.afterEvents.playerSpawn.unsubscribe(sub);
+        });
+    };
 
     private readonly onElectionLost = (): void => {
         console.log("[kairo] Election lost — entering standby mode");
@@ -515,8 +571,16 @@ class Kairo {
         this.apiPipeline.setWorld(world);
         this.eventPipeline.setWorld(world);
 
-        this.ui = new KairoUI(this.activationController);
+        // Re-run command compatibility check with data from handoff payload
+        const manifestController = new ApiManifestController(this.registryIndex, this.handleCommandConflict);
+        for (const { registry, manifest } of this.registryIndex.getAllWithManifests()) {
+            manifestController.processManifest(registry.kairoId, manifest);
+        }
+
+        this.ui = this.buildUI(this.activationController);
+        this.startUIOpenListener();
         this.isHost = true;
+        console.log(`[kairo] onHandoffReceived complete: ui=${!!this.ui}`);
 
         // Flush any standby-ready messages received before we became host
         for (const msg of this.pendingStandbyMessages) {
@@ -577,10 +641,11 @@ class Kairo {
 
             await this.activationController.startupActivate(plan);
 
-            this.ui = new KairoUI(this.activationController);
+            this.ui = this.buildUI(this.activationController);
+            this.startUIOpenListener();
 
             this.isHost = true;
-            console.log("[kairo] Election won — now active host");
+            console.log(`[kairo] Election won — now active host: ui=${!!this.ui}`);
 
             // Flush buffered standby-ready messages received during init
             for (const msg of this.pendingStandbyMessages) {
@@ -592,3 +657,15 @@ class Kairo {
 }
 
 export const kairo = new Kairo(router);
+
+function playerFromOrigin(origin: KairoCommandOrigin): Player | undefined {
+    if (origin.sourceType === CustomCommandSource.Entity) {
+        const entity = origin.sourceEntity;
+        return entity?.typeId === "minecraft:player" ? (entity as Player) : undefined;
+    }
+    if (origin.sourceType === CustomCommandSource.NPCDialogue) {
+        const initiator = origin.initiator;
+        return initiator?.typeId === "minecraft:player" ? (initiator as Player) : undefined;
+    }
+    return undefined;
+}

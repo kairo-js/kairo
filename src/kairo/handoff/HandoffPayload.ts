@@ -47,6 +47,11 @@ export type HandoffManifest = {
         readonly emitterAddonId: string;
         readonly eventName: string;
     }>;
+    readonly commands: ReadonlyArray<{
+        readonly name: string;
+        readonly mandatoryParameters: ReadonlyArray<{ readonly name: string; readonly type: string }>;
+        readonly optionalParameters: ReadonlyArray<{ readonly name: string; readonly type: string }>;
+    }>;
 };
 
 export type HandoffRuntimeEntry = {

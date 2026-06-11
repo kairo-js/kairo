@@ -2,6 +2,7 @@ import { compile, safeJsonParse } from "@kairo-js/utils";
 import type { KairoRuntime } from "../../minecraft/KairoRuntime";
 import type { Disposable } from "@kairo-js/router";
 import { HookResponseMessageSchema, type HookInvokeMessage, type HookResponseMessage } from "./hook/schema";
+import { stringifyHookInvokeMessage } from "./hook/stringify";
 import type { ResolvedHook } from "./types";
 
 const HOOK_TIMEOUT_TICKS = 20;
@@ -147,7 +148,7 @@ export class RemoteHookInvoker implements Disposable {
             });
 
             try {
-                this.runtime.send(`${targetKairoId}:hook-invoke`, JSON.stringify(msg));
+                this.runtime.send(`${targetKairoId}:hook-invoke`, stringifyHookInvokeMessage(msg));
             } catch {
                 timeoutDisposable.dispose();
                 this.pending.delete(msg.hookCorrelationId);

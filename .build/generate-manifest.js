@@ -18,6 +18,13 @@ function toVersionString(v) {
     return `${v.major}.${v.minor}.${v.patch}`;
 }
 
+function toDisplayVersionString(v) {
+    let s = toVersionString(v);
+    if (v.prerelease) s += `-${v.prerelease}`;
+    if (v.build) s += `+${v.build}`;
+    return s;
+}
+
 function toManifestTriple(v) {
     return [v.major, v.minor, v.patch];
 }
@@ -106,7 +113,7 @@ function buildCommon(header, metadata, version, kairoVersion) {
             generated_with: generatedWith,
         },
         header: {
-            name: header.name,
+            name: `${header.name} - v${toDisplayVersionString(header.version)}`,
             description: header.description,
             version: toVersionString(version),
             min_engine_version: toManifestTriple(header.min_engine_version),

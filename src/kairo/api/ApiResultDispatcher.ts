@@ -1,6 +1,7 @@
 import type { KairoRuntime } from "../../minecraft/KairoRuntime";
 import { ApiEventId } from "./ApiEventId";
 import type { ApiResult, ApiResultErrorType } from "./protocol/schema";
+import { stringifyApiResult } from "./protocol/stringify";
 import type { KairoId } from "./types";
 
 export class ApiResultDispatcher {
@@ -54,7 +55,7 @@ export class ApiResultDispatcher {
 
     private dispatch(correlationId: string, msg: ApiResult): void {
         try {
-            this.runtime.send(ApiEventId.apiResult(correlationId), JSON.stringify(msg));
+            this.runtime.send(ApiEventId.apiResult(correlationId), stringifyApiResult(msg));
         } catch {
             // send failure is silently ignored
         }
