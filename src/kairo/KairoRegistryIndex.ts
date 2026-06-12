@@ -24,6 +24,7 @@ export class KairoRegistryIndex implements KairoRegistryQueryable {
     private readonly byKey = new Map<string, KairoRegistryWithManifest>();
     private readonly byAddonId = new Map<string, KairoRegistry[]>();
     private readonly dependents = new Map<string, Set<string>>();
+    private _packExecutionOrder: readonly string[] = [];
 
     add(registry: KairoRegistry): void {
         const key = this.createRegistryKey(registry);
@@ -88,6 +89,14 @@ export class KairoRegistryIndex implements KairoRegistryQueryable {
             this.indexByAddonId(registry);
             this.indexDependents(registry);
         }
+    }
+
+    setPackExecutionOrder(order: readonly string[]): void {
+        this._packExecutionOrder = order;
+    }
+
+    getPackExecutionOrder(): readonly string[] {
+        return this._packExecutionOrder;
     }
 
     setManifest(kairoId: string, manifest: ApiManifest): void {

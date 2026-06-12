@@ -20,6 +20,7 @@ enum InitPhase {
     Election,
     Discovery,
     Registration,
+    PackOrderProbe,
     ApiRegister,
     Completed,
     Disposed,
@@ -59,12 +60,15 @@ export class KairoInitializer implements Disposable {
     private pendingDiscoveryResponses?: string[] = [];
 
     private readonly REGISTRATION_RESPONSE_TIMEOUT_TICKS = 10;
+    private readonly PACK_ORDER_PROBE_TIMEOUT_TICKS = 5;
     private readonly API_REGISTER_TIMEOUT_TICKS = 10;
+
+    private pendingOrderPongs: string[] = [];
 
     constructor(
         private readonly runtime: KairoRuntime,
         random: Random,
-        registryIndex: KairoRegistryIndex,
+        private readonly registryIndex: KairoRegistryIndex,
         private readonly ownVersion: SemVer,
         private readonly onCompleted?: (sessionPayload: string | null) => void,
         private readonly onElectionLost?: () => void,
@@ -86,6 +90,7 @@ export class KairoInitializer implements Disposable {
             [KairoInitEventId.ElectionAnnounce]: this.handleElectionAnnounce,
             [KairoInitEventId.DiscoveryResponse]: this.handleDiscoveryResponse,
             [KairoInitEventId.RegistrationResponse]: this.handleRegistrationResponse,
+            [KairoInitEventId.OrderPong]: this.handleOrderPong,
             [KairoInitEventId.ApiManifest]: this.handleApiManifest,
         });
     }
@@ -277,6 +282,29 @@ export class KairoInitializer implements Disposable {
                 throw new KairoInitError(KairoInitErrorReason.InvalidPhase);
             }
 
+            this.phase = InitPhase.PackOrderProbe;
+            this.startPackOrderProbe();
+        });
+    }
+
+    private startPackOrderProbe(): void {
+        this.runtime.send(KairoInitEventId.OrderPing, "");
+
+        this.runtime.waitTicks(this.PACK_ORDER_PROBE_TIMEOUT_TICKS).then(() => {
+            this.assertNotDisposed();
+
+            if (this.phase !== InitPhase.PackOrderProbe) {
+                throw new KairoInitError(KairoInitErrorReason.InvalidPhase);
+            }
+
+            const registeredKairoIds = this.registryIndex.getAll().map(r => r.kairoId);
+            const seen = new Set(this.pendingOrderPongs);
+            const missing = registeredKairoIds
+                .filter(id => !seen.has(id))
+                .sort();
+            const order = [...this.pendingOrderPongs, ...missing];
+            this.registryIndex.setPackExecutionOrder(order);
+
             this.phase = InitPhase.ApiRegister;
             this.onRegistrationComplete();
         });
@@ -321,6 +349,7 @@ export class KairoInitializer implements Disposable {
         this.apiManifestController = undefined;
         this.pendingDiscoveryResponses = undefined;
         this.pendingElectionCandidates = [];
+        this.pendingOrderPongs = [];
     }
 
     // ── Event handlers ────────────────────────────────────────────
@@ -363,6 +392,22 @@ export class KairoInitializer implements Disposable {
         } catch (error) {
             this.dispose();
             throw error;
+        }
+    };
+
+    private handleOrderPong = (message: string): void => {
+        if (this.phase !== InitPhase.PackOrderProbe) return;
+
+        try {
+            const parsed = JSON.parse(message) as unknown;
+            if (typeof parsed !== "object" || parsed === null) return;
+            const kairoId = (parsed as Record<string, unknown>)["kairoId"];
+            if (typeof kairoId !== "string") return;
+            if (this.pendingOrderPongs.includes(kairoId)) return;
+
+            this.pendingOrderPongs.push(kairoId);
+        } catch {
+            // malformed pong — ignore
         }
     };
 
