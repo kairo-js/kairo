@@ -73,7 +73,6 @@ export class KairoInitializer implements Disposable {
         private readonly onCompleted?: (sessionPayload: string | null) => void,
         private readonly onElectionLost?: () => void,
         private readonly onDisposed?: () => void,
-        private readonly onCommandConflict?: (conflicts: import("./api/ApiManifestController").CommandConflict[]) => void,
     ) {
         this.idRegistryProvider = new IdRegistryProvider(random);
         this.kairoIdVerifier = new KairoIdVerifier();
@@ -83,7 +82,7 @@ export class KairoInitializer implements Disposable {
             registryIndex,
             this.kairoRegistryVerifier,
         );
-        this.apiManifestController = new ApiManifestController(registryIndex, this.onCommandConflict);
+        this.apiManifestController = new ApiManifestController(registryIndex);
 
         this.initListener = new KairoInitListener({
             [KairoInitEventId.SessionResponse]: this.handleSessionResponse,
@@ -304,6 +303,13 @@ export class KairoInitializer implements Disposable {
                 .sort();
             const order = [...this.pendingOrderPongs, ...missing];
             this.registryIndex.setPackExecutionOrder(order);
+            const kairoIdToLabel = new Map(this.registryIndex.getAll().map(r => [r.kairoId, `${r.addonId}@${SemVerUtils.format(r.version)}`]));
+            const pongLabels = this.pendingOrderPongs.map((id, i) => `  ${i}: ${kairoIdToLabel.get(id) ?? id}`);
+            const missingLabels = missing.map((id, i) => `  ${this.pendingOrderPongs.length + i}: ${kairoIdToLabel.get(id) ?? id} (no pong)`);
+            const sections = ["[kairo] packExecutionOrder:", ...pongLabels];
+            if (missingLabels.length > 0) sections.push("  --- missing pong ---", ...missingLabels);
+            console.log(sections.join("\n"));
+            console.log("[kairo] PackOrderProbe complete.");
 
             this.phase = InitPhase.ApiRegister;
             this.onRegistrationComplete();

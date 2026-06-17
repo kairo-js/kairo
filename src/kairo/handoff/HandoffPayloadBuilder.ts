@@ -42,11 +42,6 @@ export class HandoffPayloadBuilder {
                     emitterAddonId: s.emitterAddonId,
                     eventName: s.eventName,
                 })),
-                commands: (manifest.commands ?? []).map((c) => ({
-                    name: c.name,
-                    mandatoryParameters: c.mandatoryParameters.map((p) => ({ name: p.name, type: p.type })),
-                    optionalParameters: c.optionalParameters.map((p) => ({ name: p.name, type: p.type })),
-                })),
             },
         }));
 

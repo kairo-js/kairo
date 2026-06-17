@@ -87,7 +87,6 @@ class Kairo {
             this.onInitComplete,
             this.onElectionLost,
             () => {},
-            this.handleCommandConflict,
         );
         this.router.waitForWorldLoad().then(() => {
             initializer.setup();
@@ -95,14 +94,14 @@ class Kairo {
         });
 
         if (REGISTER_COMMANDS) this.router.beforeEvents.startup.subscribe((ev) => {
-            ev.commands.registerEnum("kairo:addons_subcommand", [
+            ev.customCommandRegistry.registerEnum("kairo:addons_subcommand", [
                 "list",
                 "open",
                 "enable",
                 "disable",
                 "status",
             ]);
-            ev.commands.register(
+            ev.customCommandRegistry.registerCommand(
                 {
                     name: "kairo:addons",
                     description: "Manages Kairo addons",
@@ -465,18 +464,6 @@ class Kairo {
         );
     }
 
-    private readonly handleCommandConflict: ConstructorParameters<typeof ApiManifestController>[1] = (conflicts) => {
-        const names = conflicts.map(c => `§e${c.commandName}§c`).join(", ");
-        const msg = `§c[Kairo] §lコマンド互換性エラー:§r §c古いバージョンのアドオンをアンインストールしてください。\n影響コマンド: ${names}`;
-
-        const sub = world.afterEvents.playerSpawn.subscribe((ev) => {
-            if (!ev.initialSpawn) return;
-            if (ev.player.commandPermissionLevel < CommandPermissionLevel.Host) return;
-            ev.player.sendMessage(msg);
-            world.afterEvents.playerSpawn.unsubscribe(sub);
-        });
-    };
-
     private readonly onElectionLost = (): void => {
         console.log("[kairo] Election lost — entering standby mode");
         this.router.onceRegistered((ownKairoId) => {
@@ -571,8 +558,7 @@ class Kairo {
         this.apiPipeline.setWorld(world);
         this.eventPipeline.setWorld(world);
 
-        // Re-run command compatibility check with data from handoff payload
-        const manifestController = new ApiManifestController(this.registryIndex, this.handleCommandConflict);
+        const manifestController = new ApiManifestController(this.registryIndex);
         for (const { registry, manifest } of this.registryIndex.getAllWithManifests()) {
             manifestController.processManifest(registry.kairoId, manifest);
         }

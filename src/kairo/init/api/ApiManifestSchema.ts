@@ -1,11 +1,6 @@
 import { compile } from "@kairo-js/utils";
 import { type Static, Type } from "@sinclair/typebox";
 
-const CommandParamEntrySchema = Type.Object({
-    name: Type.String(),
-    type: Type.String(),
-});
-
 export const ApiManifestMessageSchema = Type.Object(
     {
         kairoId: Type.String(),
@@ -28,23 +23,13 @@ export const ApiManifestMessageSchema = Type.Object(
                 }),
             ),
         ),
-        commands: Type.Optional(
-            Type.Array(
-                Type.Object({
-                    name: Type.String(),
-                    mandatoryParameters: Type.Array(CommandParamEntrySchema),
-                    optionalParameters: Type.Array(CommandParamEntrySchema),
-                }),
-            ),
-        ),
         timestamp: Type.Integer({ minimum: 0 }),
     },
     { additionalProperties: false },
 );
 
 export type ApiManifestMessage = Static<typeof ApiManifestMessageSchema>;
-export type ApiManifest = Pick<ApiManifestMessage, "apis" | "hooks" | "eventSubscriptions" | "commands">;
+export type ApiManifest = Pick<ApiManifestMessage, "apis" | "hooks" | "eventSubscriptions">;
 export type ApiManifestHookEntry = ApiManifestMessage["hooks"][number];
-export type CommandDeclarationEntry = NonNullable<ApiManifestMessage["commands"]>[number];
 
 export const validateApiManifestMessage = compile(ApiManifestMessageSchema);
