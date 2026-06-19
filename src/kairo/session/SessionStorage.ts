@@ -39,7 +39,7 @@ export function parseSession(payload: string | null): PreviousSessionStore {
     return store;
 }
 
-export function saveSession(session: PreviousSessionStore): void {
+function serializeSession(session: PreviousSessionStore): StoredSession {
     const obj: StoredSession = {};
     for (const [addonId, entry] of session) {
         obj[addonId] = {
@@ -53,5 +53,13 @@ export function saveSession(session: PreviousSessionStore): void {
             ...(entry.disabled ? { d: true } : {}),
         };
     }
-    router.save(SESSION_KEY, obj).catch(() => {});
+    return obj;
+}
+
+export function buildSessionPayload(session: PreviousSessionStore): string {
+    return JSON.stringify(serializeSession(session));
+}
+
+export function saveSession(session: PreviousSessionStore): void {
+    router.save(SESSION_KEY, serializeSession(session)).catch(() => {});
 }

@@ -45,12 +45,10 @@ export class AddonDetailScreen {
         const displayId = activeId ?? this.resolveLatest(addonId, world, selectableIds) ?? kairoIds[0]!;
         const displayRegistry = world.registries.get(displayId)!;
 
-        // State of the addonId group
         const groupState = activeId
             ? AddonState.ACTIVE
             : selectableIds.length > 0 ? AddonState.INACTIVE : AddonState.UNRESOLVED;
 
-        // Dropdown entries
         const isActive = groupState === AddonState.ACTIVE;
         const entries: DropdownEntry[] = [
             ...(!isActive ? [{ kind: "inactive" as const }] : []),
@@ -79,21 +77,16 @@ export class AddonDetailScreen {
         const versionText = activeId
             ? SemVerUtils.format(world.registries.get(activeId)!.version)
             : "-";
-        const isLatestMode = !!activeId && session?.origin !== "explicit";
+        const latestModeSuffix = activeId && session?.origin !== "explicit" ? " (Latest)" : "";
 
-        // Build form — label/divider も formValues に null で入るので dropdown 位置を追跡
-        let fi = 0; // formIndex
+        let fi = 0;
         const form = new ModalFormData().title({ translate: displayRegistry.name });
 
         form.label(`${displayRegistry.name}\n§7${displayRegistry.description}§r`); fi++;
         form.divider();                                                    fi++;
         form.label({
             rawtext: [
-                { text: `§7id: §r${addonId}\n§7version: §r${versionText}` },
-                ...(isLatestMode
-                    ? [{ text: " §7(" }, { translate: T.detail.latest }, { text: ")§r" }]
-                    : []
-                ),
+                { text: `§7id: §r${addonId}\n§7version: §r${versionText}§7${latestModeSuffix}§r` },
                 { text: "\n§7state: §r" },
                 { text: STATE_COLOR[groupState] },
                 { translate: STATE_KEY[groupState] },

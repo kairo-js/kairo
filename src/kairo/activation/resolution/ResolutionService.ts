@@ -20,6 +20,7 @@ export class ResolutionService {
         world: KairoWorldState,
         scope: ReadonlySet<KairoId>,
         ignoreManualBlock = false,
+        preferredKairoId?: KairoId,
     ): ActivationPlan {
         // Step 0: reset resolution-generated reasons
         resetReasons(scope, world.runtimes);
@@ -51,6 +52,7 @@ export class ResolutionService {
             addonIdIndex: world.addonIdIndex,
             previousSession: world.previousSession,
             ignoreManualBlock,
+            preferredKairoId,
             declaredDependencyGraph,
             dependencyGraph: new Map(),
             resolvedReverseDependencyGraph: new Map(),

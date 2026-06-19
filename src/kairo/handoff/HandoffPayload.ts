@@ -7,6 +7,9 @@ export type HandoffPayload = {
     readonly runtimes: readonly HandoffRuntimeEntry[];
     readonly previousSession: Readonly<Record<string, HandoffSessionEntry>>;
     readonly activationOrder: readonly string[];
+    readonly commandManifests: readonly HandoffCommandManifestEntry[];
+    readonly commandRegistrars: readonly HandoffCommandRegistrarEntry[];
+    readonly pendingActivation?: HandoffPendingActivation;
 };
 
 export type HandoffSemVer = {
@@ -68,4 +71,27 @@ export type HandoffSessionEntry = {
     readonly v: HandoffSemVer;
     readonly o: "explicit" | "latest";
     readonly d?: true;
+};
+
+export type HandoffCommandDeclaration = {
+    readonly name: string;
+    readonly mandatoryParameters: readonly { readonly name: string; readonly type: string }[];
+    readonly optionalParameters: readonly { readonly name: string; readonly type: string }[];
+};
+
+export type HandoffCommandManifestEntry = {
+    readonly kairoId: string;
+    readonly commands: readonly HandoffCommandDeclaration[];
+};
+
+export type HandoffCommandRegistrarEntry = {
+    readonly name: string;
+    readonly registrarKairoId: string;
+};
+
+export type HandoffPendingActivation = {
+    readonly addonId: string;
+    readonly kairoId: string;
+    readonly origin: "explicit" | "latest";
+    readonly playerName?: string;
 };

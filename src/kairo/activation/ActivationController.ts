@@ -57,6 +57,7 @@ export class ActivationController {
         private readonly registryIndex: KairoRegistryQueryable,
         private readonly onAddonDeactivated?: (kairoId: KairoId) => void,
         private readonly onSessionChanged?: (session: PreviousSessionStore) => void,
+        private readonly onActivationStateChanged?: () => void,
     ) {
         this.executor = new ActivationExecutor(runtime);
         const optionalActivator = new OptionalActivator(this.executor);
@@ -208,7 +209,7 @@ export class ActivationController {
             if (rt.state === AddonState.ACTIVE) preActiveIds.add(id);
         }
 
-        const plan = this.resolutionService.resolve(world, scope, true);
+        const plan = this.resolutionService.resolve(world, scope, true, kairoId);
 
         const toActivate = plan.orderedKairoIds.filter(id => {
             return world.runtimes.get(id)?.state === AddonState.INACTIVE;
@@ -242,11 +243,14 @@ export class ActivationController {
         const continuingIds: KairoId[] = [];
 
         for (const depId of reverseGraph?.get(currentActiveId) ?? []) {
+            if (depId === currentActiveId || depId === newKairoId) continue;
+
             const rt = world.runtimes.get(depId);
             if (rt?.state !== AddonState.ACTIVE) continue;
 
             const depRegistry = world.registries.get(depId);
             if (!depRegistry) continue;
+            if (depRegistry.addonId === newRegistry.addonId) continue;
 
             const versionRange = depRegistry.dependencies[newRegistry.addonId];
             const compatible = versionRange
@@ -304,6 +308,7 @@ export class ActivationController {
                 this.onSessionChanged?.(world.previousSession);
             }
         }
+        this.onActivationStateChanged?.();
     }
 
     async executeEnable(kairoId: KairoId, origin: "latest" | "explicit"): Promise<void> {
@@ -345,6 +350,7 @@ export class ActivationController {
         }
 
         await this.activationService.activate(world, plan);
+        this.onActivationStateChanged?.();
     }
 
     async executeVersionSwitch(oldKairoId: KairoId, newKairoId: KairoId): Promise<void> {
@@ -393,6 +399,30 @@ export class ActivationController {
         // Activate new version
         const { plan } = this.previewEnable(newKairoId);
         await this.activationService.activate(world, plan);
+        this.onActivationStateChanged?.();
+    }
+
+    resolveLatestKairoId(addonId: string): { kairoId: KairoId; origin: "latest" | "explicit" } | undefined {
+        const world = this.world;
+        const kairoIds = world.addonIdIndex.get(addonId);
+        if (!kairoIds) return undefined;
+
+        const selectableIds = [...kairoIds].filter(
+            (id) => world.runtimes.get(id)?.state !== AddonState.UNRESOLVED,
+        );
+        const stableIds = selectableIds.filter((id) => {
+            const reg = world.registries.get(id);
+            return reg && !SemVerUtils.isPrerelease(reg.version);
+        });
+        const pool = stableIds.length > 0 ? stableIds : selectableIds;
+        const kairoId = pool.length > 0
+            ? pool.reduce((best, cur) => {
+                const a = world.registries.get(best)!;
+                const b = world.registries.get(cur)!;
+                return SemVerUtils.compare(b.version, a.version) > 0 ? cur : best;
+              })
+            : undefined;
+        return kairoId ? { kairoId, origin: "latest" } : undefined;
     }
 
     // ── kairo-specific ───────────────────────────────────────────

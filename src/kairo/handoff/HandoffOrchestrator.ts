@@ -3,6 +3,8 @@ import type { KairoRuntime } from "../../minecraft/KairoRuntime";
 import type { ActivationController } from "../activation/ActivationController";
 import type { KairoApiPipeline } from "../api/KairoApiPipeline";
 import type { KairoRegistryQueryable } from "../KairoRegistryIndex";
+import type { CommandManifestController } from "../init/command/CommandManifestController";
+import type { HandoffPendingActivation } from "./HandoffPayload";
 import { HandoffEventId } from "./HandoffEventId";
 import { HandoffPayloadBuilder } from "./HandoffPayloadBuilder";
 
@@ -16,9 +18,15 @@ export class HandoffOrchestrator {
         private readonly activationController: ActivationController,
         private readonly onComplete: () => void,
         private readonly onFailed: () => void,
+        private readonly commandManifestController?: CommandManifestController,
+        private readonly commandRegistrars?: ReadonlyMap<string, string>,
     ) {}
 
-    start(targetKairoId: string): void {
+    start(
+        targetKairoId: string,
+        origin: "explicit" | "latest" = "explicit",
+        pendingActivation?: HandoffPendingActivation,
+    ): void {
         console.log(`[kairo] HandoffOrchestrator: starting handoff to ${targetKairoId}`);
         this.apiPipeline.enterSwitchingMode();
 
@@ -26,6 +34,10 @@ export class HandoffOrchestrator {
             this.registryIndex,
             this.activationController.world,
             this.activationController.activationOrder,
+            this.commandManifestController,
+            this.commandRegistrars,
+            { kairoId: targetKairoId, origin },
+            pendingActivation,
         );
 
         try {

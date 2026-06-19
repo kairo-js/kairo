@@ -68,16 +68,13 @@ export class DependencyResolver {
                     break;
                 }
 
-                // Pick best matching KairoId (highest version, stable preferred)
-                const pool = isRangePrerelease || stableMatches.length === 0
-                    ? prereleaseMatches
-                    : stableMatches;
-
-                const bestId = pool.reduce((best, current) => {
-                    const bestReg = ctx.registries.get(best)!;
-                    const currentReg = ctx.registries.get(current)!;
-                    return SemVerUtils.compare(currentReg.version, bestReg.version) > 0 ? current : best;
-                });
+                const bestId = this.pickBestMatch(
+                    spec.addonId,
+                    isRangePrerelease || stableMatches.length === 0
+                        ? prereleaseMatches
+                        : stableMatches,
+                    ctx,
+                );
 
                 const targetRuntime = ctx.runtimes.get(bestId);
 
@@ -121,5 +118,26 @@ export class DependencyResolver {
                 }
             }
         }
+    }
+
+    private pickBestMatch(
+        addonId: string,
+        pool: readonly KairoId[],
+        ctx: ResolutionContext,
+    ): KairoId {
+        const previous = ctx.previousSession.get(addonId);
+        if (previous?.origin === "explicit") {
+            const explicit = pool.find((id) => {
+                const registry = ctx.registries.get(id);
+                return registry ? SemVerUtils.equals(registry.version, previous.version) : false;
+            });
+            if (explicit) return explicit;
+        }
+
+        return pool.reduce((best, current) => {
+            const bestReg = ctx.registries.get(best)!;
+            const currentReg = ctx.registries.get(current)!;
+            return SemVerUtils.compare(currentReg.version, bestReg.version) > 0 ? current : best;
+        });
     }
 }

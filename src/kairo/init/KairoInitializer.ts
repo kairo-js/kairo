@@ -12,6 +12,7 @@ import { KairoInitListener } from "./KairoInitListener";
 import { KairoRegistryVerifier } from "./KairoRegistryVerifier";
 import { RegistrationController } from "./registration/RegistrationController";
 import { ApiManifestController } from "./api/ApiManifestController";
+import { CommandManifestController } from "./command/CommandManifestController";
 
 const ELECTION_SCOREBOARD = "_kairo_election_iid";
 
@@ -21,6 +22,7 @@ enum InitPhase {
     Discovery,
     Registration,
     PackOrderProbe,
+    CommandManifest,
     ApiRegister,
     Completed,
     Disposed,
@@ -48,20 +50,23 @@ export class KairoInitializer implements Disposable {
     private discoveryController?: DiscoveryController;
     private registrationController?: RegistrationController;
     private apiManifestController?: ApiManifestController;
+    private commandManifestController?: CommandManifestController;
+    private commandRegistrars?: Map<string, string>;
 
-    private readonly BOOTSTRAP_TIMEOUT_TICKS = 5;
+    private readonly BOOTSTRAP_TIMEOUT_TICKS = 4;
     private sessionPayload: string | null = null;
 
-    private readonly ELECTION_TIMEOUT_TICKS = 10;
+    private readonly ELECTION_TIMEOUT_TICKS = 4;
     private electionInstanceId?: string;
     private pendingElectionCandidates: ElectionCandidate[] = [];
 
-    private readonly DISCOVERY_RESPONSE_TIMEOUT_TICKS = 10;
+    private readonly DISCOVERY_RESPONSE_TIMEOUT_TICKS = 4;
     private pendingDiscoveryResponses?: string[] = [];
 
-    private readonly REGISTRATION_RESPONSE_TIMEOUT_TICKS = 10;
-    private readonly PACK_ORDER_PROBE_TIMEOUT_TICKS = 5;
-    private readonly API_REGISTER_TIMEOUT_TICKS = 10;
+    private readonly REGISTRATION_RESPONSE_TIMEOUT_TICKS = 4;
+    private readonly PACK_ORDER_PROBE_TIMEOUT_TICKS = 4;
+    private readonly COMMAND_MANIFEST_TIMEOUT_TICKS = 4;
+    private readonly API_REGISTER_TIMEOUT_TICKS = 4;
 
     private pendingOrderPongs: string[] = [];
 
@@ -70,7 +75,11 @@ export class KairoInitializer implements Disposable {
         random: Random,
         private readonly registryIndex: KairoRegistryIndex,
         private readonly ownVersion: SemVer,
-        private readonly onCompleted?: (sessionPayload: string | null) => void,
+        private readonly onCompleted?: (
+            sessionPayload: string | null,
+            commandManifestController: CommandManifestController,
+            commandRegistrars: Map<string, string>,
+        ) => void,
         private readonly onElectionLost?: () => void,
         private readonly onDisposed?: () => void,
     ) {
@@ -83,6 +92,7 @@ export class KairoInitializer implements Disposable {
             this.kairoRegistryVerifier,
         );
         this.apiManifestController = new ApiManifestController(registryIndex);
+        this.commandManifestController = new CommandManifestController();
 
         this.initListener = new KairoInitListener({
             [KairoInitEventId.SessionResponse]: this.handleSessionResponse,
@@ -90,6 +100,7 @@ export class KairoInitializer implements Disposable {
             [KairoInitEventId.DiscoveryResponse]: this.handleDiscoveryResponse,
             [KairoInitEventId.RegistrationResponse]: this.handleRegistrationResponse,
             [KairoInitEventId.OrderPong]: this.handleOrderPong,
+            [KairoInitEventId.CommandManifest]: this.handleCommandManifest,
             [KairoInitEventId.ApiManifest]: this.handleApiManifest,
         });
     }
@@ -153,9 +164,13 @@ export class KairoInitializer implements Disposable {
             const sessionKairo = this.parseSessionKairoEntry(this.sessionPayload);
             const winner = this.selectWinner(candidates, sessionKairo);
             const isWinner = winner.instanceId === this.electionInstanceId;
+            const sessionLabel = sessionKairo
+                ? `${sessionKairo.origin}:${SemVerUtils.format(sessionKairo.version)}`
+                : "<none>";
 
             console.log(
                 `[kairo] Election result: ${isWinner ? "WINNER" : "LOSER"} | ` +
+                `session=${sessionLabel} | ` +
                 `winner=${SemVerUtils.format(winner.version)} id=${winner.instanceId} | ` +
                 `candidates(${candidates.length})=[${candidates.map(c => `${SemVerUtils.format(c.version)}:${c.instanceId}`).join(", ")}]`,
             );
@@ -222,20 +237,28 @@ export class KairoInitializer implements Disposable {
     }
 
     private selectWinner(candidates: ElectionCandidate[], sessionKairo?: SessionKairoEntry): ElectionCandidate {
-        // Priority 1: explicit session preference
+        // Priority 1: explicit session preference (exact version match)
         if (sessionKairo?.origin === "explicit") {
-            const preferred = candidates.find(c => SemVerUtils.equals(c.version, sessionKairo.version));
-            if (preferred) return preferred;
+            const matching = candidates.filter(c => SemVerUtils.equals(c.version, sessionKairo.version));
+            if (matching.length > 0) return this.pickByInstanceId(matching);
         }
         // Priority 2: latest (stable preferred, fallback to prerelease, tiebreak by instanceId)
         const stable = candidates.filter(c => !SemVerUtils.isPrerelease(c.version));
         const pool = stable.length > 0 ? stable : candidates;
-        return pool.reduce((best, cur) => {
+        return this.pickLatest(pool);
+    }
+
+    private pickLatest(candidates: ElectionCandidate[]): ElectionCandidate {
+        return candidates.reduce((best, cur) => {
             const cmp = SemVerUtils.compare(cur.version, best.version);
             if (cmp > 0) return cur;
             if (cmp < 0) return best;
             return cur.instanceId < best.instanceId ? cur : best;
         });
+    }
+
+    private pickByInstanceId(candidates: ElectionCandidate[]): ElectionCandidate {
+        return candidates.reduce((best, cur) => cur.instanceId < best.instanceId ? cur : best);
     }
 
     private generateRandomHex(): string {
@@ -311,6 +334,27 @@ export class KairoInitializer implements Disposable {
             console.log(sections.join("\n"));
             console.log("[kairo] PackOrderProbe complete.");
 
+            this.phase = InitPhase.CommandManifest;
+            this.startCommandManifestPhase();
+        });
+    }
+
+    private startCommandManifestPhase(): void {
+        this.runtime.send(KairoInitEventId.CommandManifestRequest, "");
+
+        this.runtime.waitTicks(this.COMMAND_MANIFEST_TIMEOUT_TICKS).then(() => {
+            this.assertNotDisposed();
+
+            if (this.phase !== InitPhase.CommandManifest) {
+                throw new KairoInitError(KairoInitErrorReason.InvalidPhase);
+            }
+
+            const packExecutionOrder = this.registryIndex.getPackExecutionOrder();
+            this.commandRegistrars = this.commandManifestController!.resolveRegistrars(packExecutionOrder);
+
+            const registrarSet = new Set(this.commandRegistrars.values());
+            console.log(`[kairo] CommandManifest complete: ${this.commandRegistrars.size} commands, ${registrarSet.size} registrars`);
+
             this.phase = InitPhase.ApiRegister;
             this.onRegistrationComplete();
         });
@@ -325,8 +369,10 @@ export class KairoInitializer implements Disposable {
             }
 
             this.phase = InitPhase.Completed;
+            const cmdController = this.commandManifestController!;
+            const cmdRegistrars = this.commandRegistrars ?? new Map();
             this.dispose();
-            this.onCompleted?.(this.sessionPayload);
+            this.onCompleted?.(this.sessionPayload, cmdController, cmdRegistrars);
         });
     }
 
@@ -353,6 +399,8 @@ export class KairoInitializer implements Disposable {
         this.discoveryController = undefined;
         this.registrationController = undefined;
         this.apiManifestController = undefined;
+        this.commandManifestController = undefined;
+        this.commandRegistrars = undefined;
         this.pendingDiscoveryResponses = undefined;
         this.pendingElectionCandidates = [];
         this.pendingOrderPongs = [];
@@ -414,6 +462,20 @@ export class KairoInitializer implements Disposable {
             this.pendingOrderPongs.push(kairoId);
         } catch {
             // malformed pong — ignore
+        }
+    };
+
+    private handleCommandManifest = (message: string): void => {
+        if (this.phase !== InitPhase.CommandManifest) return;
+        try {
+            const parsed = JSON.parse(message) as unknown;
+            if (typeof parsed !== "object" || parsed === null) return;
+            const obj = parsed as Record<string, unknown>;
+            if (typeof obj["kairoId"] !== "string") return;
+            if (!Array.isArray(obj["commands"])) return;
+            this.commandManifestController!.handleManifest(obj["kairoId"], obj["commands"]);
+        } catch {
+            // malformed manifest — ignore
         }
     };
 

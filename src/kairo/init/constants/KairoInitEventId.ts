@@ -1,6 +1,7 @@
 export enum KairoInitEventId {
     SessionRequest = "kairo:session-request",
     SessionResponse = "kairo:session-response",
+    SessionSave = "kairo:session-save",
     ElectionAnnounce = "kairo:bootstrap-election-announce",
     DiscoveryQuery = "kairo:discovery_query",
     DiscoveryResponse = "kairo:discovery_response",
@@ -9,5 +10,8 @@ export enum KairoInitEventId {
     RegistrationResult = "kairo:registration_result",
     OrderPing = "kairo:order-ping",
     OrderPong = "kairo:order-pong",
+    CommandManifestRequest = "kairo:cmd-manifest-req",
+    CommandManifest = "kairo:cmd-manifest",
+    CommandDelegatableUpdate = "kairo:cmd-delegatable",
     ApiManifest = "kairo:api_manifest",
 }

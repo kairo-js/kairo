@@ -36,7 +36,12 @@ export class ConflictResolver {
     private pickWinner(group: Set<KairoId>, ctx: ResolutionContext): KairoId {
         const ids = [...group];
 
-        // Priority 0 (manual enable only): prefer version that is required by another addon in scope
+        // Priority 0: if the caller explicitly requested a target version, keep it.
+        if (ctx.preferredKairoId && group.has(ctx.preferredKairoId)) {
+            return ctx.preferredKairoId;
+        }
+
+        // Priority 1 (manual enable only): prefer version that is required by another addon in scope
         if (ctx.ignoreManualBlock) {
             for (const id of ids) {
                 for (const deps of ctx.dependencyGraph.values()) {
@@ -45,7 +50,7 @@ export class ConflictResolver {
             }
         }
 
-        // Priority 1: previous session explicit version
+        // Priority 2: previous session explicit version
         for (const id of ids) {
             const registry = ctx.registries.get(id);
             if (!registry) continue;
@@ -55,7 +60,7 @@ export class ConflictResolver {
             }
         }
 
-        // Priority 2: previous session latest-origin 竊・use current latest
+        // Priority 3: previous session latest-origin 竊・use current latest
         const anyLatest = ids.find(id => {
             const registry = ctx.registries.get(id);
             if (!registry) return false;
@@ -66,13 +71,13 @@ export class ConflictResolver {
             return this.latestVersionId(ids, addonId, ctx);
         }
 
-        // Priority 3: no previous session 竊・latest
+        // Priority 4: no previous session 竊・latest
         if (ids.length > 0) {
             const addonId = ctx.registries.get(ids[0]!)!.addonId;
             return this.latestVersionId(ids, addonId, ctx);
         }
 
-        // Priority 4: kairoId lexicographic (deterministic fallback)
+        // Priority 5: kairoId lexicographic (deterministic fallback)
         return [...ids].sort()[0]!;
     }
 
