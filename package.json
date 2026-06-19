@@ -44,7 +44,7 @@
     },
     "dependencies": {
         "@kairo-js/properties": "1.2.1",
-        "@kairo-js/router": "1.0.0-beta.0",
+        "@kairo-js/router": "1.0.0-beta.1",
         "@kairo-js/utils": "1.2.1",
         "@sinclair/typebox": "^0.34.49",
         "fast-json-stringify": "^6.3.0",
