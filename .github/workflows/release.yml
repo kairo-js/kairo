@@ -32,10 +32,11 @@ jobs:
 
       - name: Create release artifacts
         run: |
-          cp -r BP kairo-${{ github.ref_name }}-BP
-          cp -r RP kairo-${{ github.ref_name }}-RP
-          zip -r kairo-${{ github.ref_name }}.zip kairo-${{ github.ref_name }}-BP/ kairo-${{ github.ref_name }}-RP/
-          cp kairo-${{ github.ref_name }}.zip kairo-${{ github.ref_name }}.mcaddon
+          NAME="kairo-${{ github.ref_name }}"
+          cd BP && zip -r "../${NAME}-BP.mcpack" . && cd ..
+          cd RP && zip -r "../${NAME}-RP.mcpack" . && cd ..
+          zip "${NAME}.zip" "${NAME}-BP.mcpack" "${NAME}-RP.mcpack"
+          cp "${NAME}.zip" "${NAME}.mcaddon"
 
       - name: Detect prerelease
         id: prerelease
