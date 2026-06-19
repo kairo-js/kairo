@@ -126,9 +126,9 @@ router.send("economy-addon", "onTransaction", { amount: 50 });
 const result = await router.request<{ balance: number }>("economy-addon", "getBalance", { playerId: "..." });
 if ("cancelled" in result) {
     // キャンセルされた場合
-    console.log(result.reason);
+    world.sendMessage(result.reason);
 } else {
-    console.log(result.balance);
+    world.sendMessage(String(result.balance));
 }
 
 // タイムアウトを延長したい場合
@@ -253,7 +253,7 @@ router.beforeEvents.startup.subscribe((ev) => {
         return {
             priority: 5,
             before: async (_ctx: unknown) => { startTime = Date.now(); },
-            after:  async (_ctx: unknown) => { console.log(Date.now() - startTime); },
+            after:  async (_ctx: unknown) => { world.sendMessage(String(Date.now() - startTime)); },
         };
     }
     ev.api.hook("addon-a", "test", createTimingHook());

@@ -140,10 +140,7 @@ export class KairoInitializer implements Disposable {
         registry.register(instanceId);
         this.electionInstanceId = instanceId;
 
-        const ownVerStr = SemVerUtils.format(this.ownVersion);
-        console.log(`[kairo] Election started: own=${ownVerStr} instanceId=${instanceId}`);
-
-        // Broadcast candidacy
+        const ownVerStr = SemVerUtils.format(this.ownVersion);        // Broadcast candidacy
         const msg = JSON.stringify(this.encodeAnnounce(this.ownVersion, instanceId));
         this.runtime.send(KairoInitEventId.ElectionAnnounce, msg);
 
@@ -166,16 +163,7 @@ export class KairoInitializer implements Disposable {
             const isWinner = winner.instanceId === this.electionInstanceId;
             const sessionLabel = sessionKairo
                 ? `${sessionKairo.origin}:${SemVerUtils.format(sessionKairo.version)}`
-                : "<none>";
-
-            console.log(
-                `[kairo] Election result: ${isWinner ? "WINNER" : "LOSER"} | ` +
-                `session=${sessionLabel} | ` +
-                `winner=${SemVerUtils.format(winner.version)} id=${winner.instanceId} | ` +
-                `candidates(${candidates.length})=[${candidates.map(c => `${SemVerUtils.format(c.version)}:${c.instanceId}`).join(", ")}]`,
-            );
-
-            if (isWinner) {
+                : "<none>";            if (isWinner) {
                 this.phase = InitPhase.Discovery;
                 this.startDiscovery();
             } else {
@@ -330,11 +318,7 @@ export class KairoInitializer implements Disposable {
             const pongLabels = this.pendingOrderPongs.map((id, i) => `  ${i}: ${kairoIdToLabel.get(id) ?? id}`);
             const missingLabels = missing.map((id, i) => `  ${this.pendingOrderPongs.length + i}: ${kairoIdToLabel.get(id) ?? id} (no pong)`);
             const sections = ["[kairo] packExecutionOrder:", ...pongLabels];
-            if (missingLabels.length > 0) sections.push("  --- missing pong ---", ...missingLabels);
-            console.log(sections.join("\n"));
-            console.log("[kairo] PackOrderProbe complete.");
-
-            this.phase = InitPhase.CommandManifest;
+            if (missingLabels.length > 0) sections.push("  --- missing pong ---", ...missingLabels);          this.phase = InitPhase.CommandManifest;
             this.startCommandManifestPhase();
         });
     }
@@ -352,10 +336,7 @@ export class KairoInitializer implements Disposable {
             const packExecutionOrder = this.registryIndex.getPackExecutionOrder();
             this.commandRegistrars = this.commandManifestController!.resolveRegistrars(packExecutionOrder);
 
-            const registrarSet = new Set(this.commandRegistrars.values());
-            console.log(`[kairo] CommandManifest complete: ${this.commandRegistrars.size} commands, ${registrarSet.size} registrars`);
-
-            this.phase = InitPhase.ApiRegister;
+            const registrarSet = new Set(this.commandRegistrars.values());            this.phase = InitPhase.ApiRegister;
             this.onRegistrationComplete();
         });
     }
@@ -417,9 +398,7 @@ export class KairoInitializer implements Disposable {
         if (this.phase !== InitPhase.Election) return;
         const candidate = this.parseElectionAnnounce(message);
         if (candidate) {
-            this.pendingElectionCandidates.push(candidate);
-            console.log(`[kairo] Election: candidate received version=${SemVerUtils.format(candidate.version)} instanceId=${candidate.instanceId}`);
-        }
+            this.pendingElectionCandidates.push(candidate);        }
     };
 
     private handleDiscoveryResponse = (message: string): void => {

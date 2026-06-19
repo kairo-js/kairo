@@ -18,12 +18,7 @@ export class CommandManifestController {
     private readonly manifests = new Map<string, CommandDeclarationEntry[]>();
     private readonly conflicts: CommandSyntaxConflict[] = [];
 
-    handleManifest(kairoId: string, commands: CommandDeclarationEntry[]): void {
-        console.log(
-            `[kairo:cmd-manifest] handleManifest kairoId=${kairoId} ` +
-            `commands=${commands.map(c => c.name).join(",")}`,
-        );
-        this.manifests.set(kairoId, commands);
+    handleManifest(kairoId: string, commands: CommandDeclarationEntry[]): void {        this.manifests.set(kairoId, commands);
     }
 
     getManifests(): ReadonlyMap<string, readonly CommandDeclarationEntry[]> {
@@ -40,17 +35,10 @@ export class CommandManifestController {
         this.conflicts.length = 0;
 
         for (const kairoId of packExecutionOrder) {
-            const cmds = this.manifests.get(kairoId) ?? [];
-            console.log(
-                `[kairo:cmd-manifest] resolveRegistrars orderEntry=${kairoId} ` +
-                `commands=${cmds.map(c => c.name).join(",")}`,
-            );
-            for (const cmd of cmds) {
+            const cmds = this.manifests.get(kairoId) ?? [];            for (const cmd of cmds) {
                 if (!registrars.has(cmd.name)) {
                     registrars.set(cmd.name, kairoId);
-                    firstEntry.set(cmd.name, cmd);
-                    console.log(`[kairo:cmd-manifest] registrar command=${cmd.name} kairoId=${kairoId}`);
-                    continue;
+                    firstEntry.set(cmd.name, cmd);                    continue;
                 }
 
                 const ref = firstEntry.get(cmd.name)!;
@@ -89,28 +77,15 @@ export class CommandManifestController {
             return delegatable;
         }
 
-        const activeKairoId = getActiveKairoId(registrarRegistry.addonId);
-        console.log(
-            `[kairo:cmd-manifest] computeDelegatable registrar=${registrarKairoId} ` +
-            `addonId=${registrarRegistry.addonId} active=${activeKairoId ?? "<none>"}`,
-        );
-
-        for (const cmd of registrarCmds) {
+        const activeKairoId = getActiveKairoId(registrarRegistry.addonId);        for (const cmd of registrarCmds) {
             if (!activeKairoId || activeKairoId === registrarKairoId) {
-                delegatable.set(cmd.name, false);
-                console.log(`[kairo:cmd-manifest] delegatable command=${cmd.name} value=false reason=no-active-or-self`);
-                continue;
+                delegatable.set(cmd.name, false);                continue;
             }
 
             const activeCmds = this.manifests.get(activeKairoId) ?? [];
             const activeCmd = activeCmds.find(c => c.name === cmd.name);
             const value = activeCmd ? areSyntaxCompatible(cmd, activeCmd) : false;
-            delegatable.set(cmd.name, value);
-            console.log(
-                `[kairo:cmd-manifest] delegatable command=${cmd.name} ` +
-                `value=${value} activeHasCommand=${!!activeCmd}`,
-            );
-        }
+            delegatable.set(cmd.name, value);        }
 
         return delegatable;
     }

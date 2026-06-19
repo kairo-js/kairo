@@ -26,9 +26,7 @@ export class HandoffOrchestrator {
         targetKairoId: string,
         origin: "explicit" | "latest" = "explicit",
         pendingActivation?: HandoffPendingActivation,
-    ): void {
-        console.log(`[kairo] HandoffOrchestrator: starting handoff to ${targetKairoId}`);
-        this.apiPipeline.enterSwitchingMode();
+    ): void {        this.apiPipeline.enterSwitchingMode();
 
         const payload = new HandoffPayloadBuilder().build(
             this.registryIndex,
@@ -66,9 +64,7 @@ export class HandoffOrchestrator {
             if (id !== HandoffEventId.HandoffDone) return;
             done = true;
             doneListener.dispose();
-            timeoutHandle.dispose();
-            console.log("[kairo] HandoffOrchestrator: handoff-done received — tearing down host infrastructure");
-            this.onComplete();
+            timeoutHandle.dispose();            this.onComplete();
         });
     }
 }

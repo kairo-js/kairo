@@ -26,19 +26,12 @@ export class HandoffReceiver {
             }
 
             this.listener?.dispose();
-            this.listener = undefined;
-
-            console.log(`[kairo] HandoffReceiver: payload received (registries=${payload.registries.length})`);
-
-            try {
+            this.listener = undefined;            try {
                 this.onReceive(payload);
             } catch (e) {
                 console.error("[kairo] HandoffReceiver: setup failed:", e);
                 return;
-            }
-
-            console.log("[kairo] HandoffReceiver: setup complete — sending handoff-done");
-            try {
+            }            try {
                 this.runtime.send(HandoffEventId.HandoffDone, "");
             } catch {}
         });
