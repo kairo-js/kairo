@@ -1,6 +1,6 @@
 {
     "name": "kairo",
-    "version": "1.0.0",
+    "version": "1.0.0-beta.0",
     "description": "**Stable Script API**\r - @minecraft/server - 2.5.0",
     "main": "index.js",
     "type": "module",
@@ -9,6 +9,7 @@
         "clean": "rimraf BP/scripts",
         "typecheck": "tsc --noEmit",
         "build": "pnpm run clean && pnpm run typecheck && node .build/build.mjs && pnpm run deploy",
+        "build:ci": "pnpm run clean && pnpm run typecheck && node .build/build.mjs && node .build/ci-prepare.mjs",
         "deploy": "node .build/deploy.js"
     },
     "repository": {
@@ -43,7 +44,7 @@
     },
     "dependencies": {
         "@kairo-js/properties": "1.2.1",
-        "@kairo-js/router": "link:../../packages/kairo-router",
+        "@kairo-js/router": "1.0.0-beta.0",
         "@kairo-js/utils": "1.2.1",
         "@sinclair/typebox": "^0.34.49",
         "fast-json-stringify": "^6.3.0",

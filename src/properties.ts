@@ -11,10 +11,9 @@ export const properties: AddonProperties = {
             "Enables communication between multiple behavior packs by leveraging the ScriptAPI as a communication layer.",
         version: {
             major: 1,
-            minor: 1,
+            minor: 0,
             patch: 0,
-            // prerelease: "preview.1",
-            // build: "abc123",
+            prerelease: "beta.0",
         },
         min_engine_version: { major: 1, minor: 21, patch: 132 },
     },
