@@ -9,6 +9,7 @@ import { DeactivationExecutor } from "./DeactivationExecutor";
 import { OptionalActivator } from "./OptionalActivator";
 import { buildDependencyClosure } from "./resolution/DependencyClosureBuilder";
 import { ResolutionService } from "./resolution/ResolutionService";
+import { satisfiesVersionRange } from "./resolution/versionRange";
 import { setInactive } from "./helpers/RuntimeTransition";
 import { markBlockedDependents } from "./helpers/BlockedDependents";
 import type { ActivationPlan } from "./types/plan";
@@ -254,7 +255,9 @@ export class ActivationController {
 
             const versionRange = depRegistry.dependencies[newRegistry.addonId];
             const compatible = versionRange
-                ? SemVerUtils.satisfies(newRegistry.version, versionRange)
+                ? satisfiesVersionRange(newRegistry.version, versionRange, {
+                    includePrerelease: !this.hasStableCandidate(world, newRegistry.addonId),
+                })
                 : false;
 
             if (compatible) {
@@ -442,7 +445,9 @@ export class ActivationController {
     private buildManualActivateScope(kairoId: KairoId): ReadonlySet<KairoId> {
         const world = this.world;
         const versionMatcher = (spec: AddonDependencySpec, reg: KairoRegistry): boolean =>
-            SemVerUtils.satisfies(reg.version, spec.versionRange);
+            satisfiesVersionRange(reg.version, spec.versionRange, {
+                includePrerelease: !this.hasStableCandidate(world, spec.addonId),
+            });
 
         const closure = buildDependencyClosure(kairoId, world.registries, world.addonIdIndex, versionMatcher);
         const scope = new Set<KairoId>(closure);
@@ -476,6 +481,13 @@ export class ActivationController {
         }
 
         return graph;
+    }
+
+    private hasStableCandidate(world: KairoWorldState, addonId: string): boolean {
+        return [...(world.addonIdIndex.get(addonId) ?? [])].some((kairoId) => {
+            const registry = world.registries.get(kairoId);
+            return registry !== undefined && !SemVerUtils.isPrerelease(registry.version);
+        });
     }
 
     private buildWorldState(initialSession?: PreviousSessionStore): KairoWorldState {

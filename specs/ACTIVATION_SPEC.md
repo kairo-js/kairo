@@ -610,8 +610,9 @@ semver の build メタデータ（`+` 以降）は完全に無視する。
 ### prerelease の扱い
 
 - `-` に続く任意のラベル（`-beta.0`, `-preview`, `-rc.1` 等）を prerelease 版と見なす
-- **安定版を前提とした指定**（例: `^1.0.0`）では、prerelease を自動起動の対象に含めない
-  - ただし比較は行い、「解決可能だが prerelease のみ」と判定 → `INACTIVE`（`PRERELEASE_ONLY`）
+- **安定版を前提とした指定**（例: `^1.0.0`）では、安定版が存在する場合は prerelease を自動起動の対象に含めない
+  - ただし依存先 addon に安定版候補が 1 つも存在しない場合は prerelease を対象に含める
+  - 安定版候補が存在するにもかかわらず prerelease でしか解決できない場合 → `INACTIVE`（`PRERELEASE_ONLY`）
 - **prerelease を前提とした指定**（例: `^1.0.0-beta.0`）では prerelease を含む
 - `*` は prerelease を含まない。安定版が存在しない場合のみ prerelease を含む
 
@@ -619,7 +620,8 @@ semver の build メタデータ（`+` 以降）は完全に無視する。
 
 - **解決可能**: 安定版・prerelease 両方を考慮して、バージョン範囲を満たすものが1つ以上存在する
 - **安定版で解決可能**: 上記のうち安定版（prerelease ラベルなし）のみで満たせる
-- 解決可能だが安定版で解決できない → `INACTIVE`（`PRERELEASE_ONLY`）
+- 依存先 addon に安定版候補が存在せず、prerelease で解決可能 → prerelease の最新を選択
+- 依存先 addon に安定版候補が存在するが、安定版で解決できない → `INACTIVE`（`PRERELEASE_ONLY`）
 - 解決不可能 → `UNRESOLVED`（`VERSION_NOT_SATISFIED`）
 
 ---
@@ -760,10 +762,17 @@ else:
     reasons  += DEPENDENCY_UNRESOLVED
 ```
 
-**prerelease only**（安定版が存在しない）
+**prerelease only**（安定版候補は存在するが、解決可能なものが prerelease のみ）
 ```
 state     = INACTIVE
 reasons  += PRERELEASE_ONLY
+```
+
+**prerelease fallback**（依存先 addon に安定版候補が存在しない）
+```
+state     = INACTIVE
+reasons  += none
+dependencyGraph += selected prerelease KairoId
 ```
 
 ---
