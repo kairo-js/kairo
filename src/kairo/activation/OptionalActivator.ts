@@ -1,6 +1,7 @@
 import { SemVerUtils } from "@kairo-js/utils";
 import { buildDependencyClosure } from "./resolution/DependencyClosureBuilder";
 import { ResolutionService } from "./resolution/ResolutionService";
+import { satisfiesVersionRange } from "./resolution/versionRange";
 import type { ActivationExecutor } from "./ActivationExecutor";
 import type { ActivationOutcome, ActivationSession } from "./types/context";
 import type { AddonDependencySpec, AddonId, KairoId } from "./types/state";
@@ -41,8 +42,17 @@ export class OptionalActivator {
         session.optionalStack.add(registry.addonId);
 
         try {
-            const versionMatcher = (spec: AddonDependencySpec, reg: typeof registry): boolean =>
-                SemVerUtils.satisfies(reg.version, spec.versionRange);
+            const versionMatcher = (spec: AddonDependencySpec, reg: typeof registry): boolean => {
+                const candidates = world.addonIdIndex.get(spec.addonId) ?? new Set();
+                const hasStableCandidate = [...candidates].some((candidateId) => {
+                    const candidateRegistry = world.registries.get(candidateId);
+                    return candidateRegistry !== undefined
+                        && !SemVerUtils.isPrerelease(candidateRegistry.version);
+                });
+                return satisfiesVersionRange(reg.version, spec.versionRange, {
+                    includePrerelease: !hasStableCandidate,
+                });
+            };
 
             const closure = buildDependencyClosure(kairoId, world.registries, world.addonIdIndex, versionMatcher);
             const scope = new Set<KairoId>(closure);

@@ -2,6 +2,7 @@
 import { AddonState, InactiveReasonCode, UnresolvedReasonCode, type KairoId } from "../types/state";
 import type { ResolutionContext } from "../types/context";
 import { setInactive, setUnresolved } from "../helpers/RuntimeTransition";
+import { satisfiesVersionRange } from "./versionRange";
 
 export class DependencyResolver {
     resolve(ctx: ResolutionContext): void {
@@ -27,6 +28,11 @@ export class DependencyResolver {
                 }
 
                 const isRangePrerelease = spec.versionRange.includes("-");
+                const hasStableCandidate = [...candidates].some((candidateId) => {
+                    const candidateRegistry = ctx.registries.get(candidateId);
+                    return candidateRegistry !== undefined
+                        && !SemVerUtils.isPrerelease(candidateRegistry.version);
+                });
 
                 // Collect all matching KairoIds
                 const stableMatches: KairoId[] = [];
@@ -35,11 +41,16 @@ export class DependencyResolver {
                 for (const candidateId of candidates) {
                     const candidateRegistry = ctx.registries.get(candidateId);
                     if (!candidateRegistry) continue;
+                    const isPrerelease = SemVerUtils.isPrerelease(candidateRegistry.version);
 
-                    const satisfies = SemVerUtils.satisfies(candidateRegistry.version, spec.versionRange);
+                    const satisfies = satisfiesVersionRange(
+                        candidateRegistry.version,
+                        spec.versionRange,
+                        { includePrerelease: !hasStableCandidate },
+                    );
                     if (!satisfies) continue;
 
-                    if (SemVerUtils.isPrerelease(candidateRegistry.version)) {
+                    if (isPrerelease) {
                         prereleaseMatches.push(candidateId);
                     } else {
                         stableMatches.push(candidateId);
@@ -58,8 +69,8 @@ export class DependencyResolver {
                     break;
                 }
 
-                // prerelease-only when range is stable but only prereleases match
-                if (!isRangePrerelease && stableMatches.length === 0) {
+                // Prefer stable versions. If an addon only ships prereleases, allow them.
+                if (!isRangePrerelease && hasStableCandidate && stableMatches.length === 0) {
                     setInactive(runtime, {
                         code: InactiveReasonCode.PRERELEASE_ONLY,
                         message: `Only prerelease versions of "${spec.addonId}" satisfy "${spec.versionRange}"`,
