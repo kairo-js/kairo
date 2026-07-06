@@ -28,7 +28,7 @@ Kairo is built using the stable Script API:
 
 ## Setup && Build
 
-This project bundles scripts with **esbuild** via `build.mjs`.
+This project bundles scripts with `@kairo-js/build-tools`.
 
 1. Install dependencies:
     ```bash
