@@ -6,6 +6,8 @@
     "type": "module",
     "packageManager": "pnpm@10.31.0",
     "scripts": {
+        "init": "kairo-build init",
+        "sync": "kairo-build sync",
         "clean": "kairo-build clean",
         "typecheck": "kairo-build typecheck",
         "build": "kairo-build build",
