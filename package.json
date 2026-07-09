@@ -1,6 +1,6 @@
 {
     "name": "kairo",
-    "version": "1.0.0-beta.2",
+    "version": "1.0.0-beta.3",
     "description": "**Stable Script API**\r - @minecraft/server - 2.5.0",
     "main": "index.js",
     "type": "module",
