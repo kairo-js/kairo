@@ -4,14 +4,13 @@ package-lock.json
 
 # build output
 BP/scripts/
-BP/scripts/
 BP/manifest.json
 RP/manifest.json
 BP/pack_icon.png
 RP/pack_icon.png
 RP/textures/*/pack_icon.png
 
-# generated files
+# generated version-local files
 .build/.manifest-version.json
 .build/.uuid.json
 
