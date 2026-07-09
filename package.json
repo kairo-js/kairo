@@ -23,7 +23,7 @@
     "author": "",
     "license": "ISC",
     "devDependencies": {
-        "@kairo-js/build-tools": "1.0.0-beta.2",
+        "@kairo-js/build-tools": "1.0.0-beta.3",
         "@minecraft/common": "^1.2.0",
         "@minecraft/debug-utilities": "1.0.0-beta.1.20.70-preview.20",
         "@minecraft/diagnostics": "1.0.0-beta.1.21.70-preview.22",
