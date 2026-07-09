@@ -6,13 +6,13 @@
     "type": "module",
     "packageManager": "pnpm@10.31.0",
     "scripts": {
-        "init": "kairo-build init",
-        "sync": "kairo-build sync",
-        "clean": "kairo-build clean",
-        "typecheck": "kairo-build typecheck",
-        "build": "kairo-build build",
-        "build:ci": "kairo-build build-ci",
-        "deploy": "kairo-build deploy"
+        "init": "kairo init",
+        "sync": "kairo sync",
+        "clean": "kairo clean",
+        "typecheck": "kairo typecheck",
+        "build": "kairo build",
+        "build:ci": "kairo build-ci",
+        "deploy": "kairo deploy"
     },
     "kairoBuild": {
         "platform": "neutral"
@@ -25,7 +25,7 @@
     "author": "",
     "license": "ISC",
     "devDependencies": {
-        "@kairo-js/build-tools": "1.0.0-beta.3",
+        "@kairo-js/build-tools": "1.0.0-beta.4",
         "@minecraft/common": "^1.2.0",
         "@minecraft/debug-utilities": "1.0.0-beta.1.20.70-preview.20",
         "@minecraft/diagnostics": "1.0.0-beta.1.21.70-preview.22",

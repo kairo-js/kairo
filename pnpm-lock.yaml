@@ -31,8 +31,8 @@ importers:
         version: 7.8.0
     devDependencies:
       '@kairo-js/build-tools':
-        specifier: 1.0.0-beta.3
-        version: 1.0.0-beta.3(@kairo-js/properties@1.2.1)
+        specifier: 1.0.0-beta.4
+        version: 1.0.0-beta.4(@kairo-js/properties@1.2.1)
       '@minecraft/common':
         specifier: ^1.2.0
         version: 1.2.0
@@ -258,8 +258,8 @@ packages:
   '@fastify/merge-json-schemas@0.2.1':
     resolution: {integrity: sha512-OA3KGBCy6KtIvLf8DINC5880o5iBlDX4SxzLQS8HorJAbqluzLRn80UXU0bxZn7UOFhFgpRJDasfwn9nG4FG4A==}
 
-  '@kairo-js/build-tools@1.0.0-beta.3':
-    resolution: {integrity: sha512-8HZEYKFAR6uFvZjAYFaOQ6qZUT9NhV4VyJpcZeL5PTwTbt4i0o9xwB5R6zxzAnopd8CNHwJnhz50XQyZJzvP4A==}
+  '@kairo-js/build-tools@1.0.0-beta.4':
+    resolution: {integrity: sha512-0zmAD8M6RjS+Bts3YQ5U5g74OwqsEK3gJkK19vPRmeDs16tTz8FdU3GZFGBnedZnW/6VuNenQgNQByWEwDT3ig==}
     hasBin: true
     peerDependencies:
       '@kairo-js/properties': ^1.2.1
@@ -539,7 +539,7 @@ snapshots:
     dependencies:
       dequal: 2.0.3
 
-  '@kairo-js/build-tools@1.0.0-beta.3(@kairo-js/properties@1.2.1)':
+  '@kairo-js/build-tools@1.0.0-beta.4(@kairo-js/properties@1.2.1)':
     dependencies:
       '@kairo-js/properties': 1.2.1
       esbuild: 0.27.3
