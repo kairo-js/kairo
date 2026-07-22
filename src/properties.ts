@@ -13,7 +13,7 @@ export const properties: AddonProperties = {
             major: 1,
             minor: 0,
             patch: 0,
-            prerelease: "beta.3",
+            prerelease: "beta.4",
         },
         min_engine_version: { major: 1, minor: 21, patch: 132 },
     },
