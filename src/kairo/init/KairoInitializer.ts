@@ -60,10 +60,10 @@ export class KairoInitializer implements Disposable {
     private electionInstanceId?: string;
     private pendingElectionCandidates: ElectionCandidate[] = [];
 
-    private readonly DISCOVERY_RESPONSE_TIMEOUT_TICKS = 4;
+    private readonly DISCOVERY_RESPONSE_TIMEOUT_TICKS = 20;
     private pendingDiscoveryResponses?: string[] = [];
 
-    private readonly REGISTRATION_RESPONSE_TIMEOUT_TICKS = 4;
+    private readonly REGISTRATION_RESPONSE_TIMEOUT_TICKS = 20;
     private readonly PACK_ORDER_PROBE_TIMEOUT_TICKS = 4;
     private readonly COMMAND_MANIFEST_TIMEOUT_TICKS = 4;
     private readonly API_REGISTER_TIMEOUT_TICKS = 4;
